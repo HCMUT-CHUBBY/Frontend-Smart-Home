@@ -1,0 +1,271 @@
+/* src/styles/login.module.scss - PHIÊN BẢN NÂNG CẤP */
+@import 'vars'; // Nếu bạn có file biến màu riêng
+
+// --- Biến màu (Ví dụ - bạn có thể tùy chỉnh hoặc dùng file vars) ---
+$primary-color: #4f46e5; // Indigo-600
+$primary-hover-color: #4338ca; // Indigo-700
+$secondary-color: #6366f1; // Indigo-500
+$light-bg: #f0f4ff; // Màu nền xanh nhạt hơn
+$card-bg: #ffffff;
+$text-dark: #1f2937; // Gray-800
+$text-medium: #6b7280; // Gray-500
+$text-light: #9ca3af; // Gray-400
+$border-color: #e5e7eb; // Gray-200
+$input-bg: #f9fafb; // Gray-50
+$danger-color: #ef4444; // Red-500
+$success-color: #10b981; // Emerald-500
+
+// --- Mixins (Ví dụ) ---
+@mixin transition($properties...) {
+  transition: $properties 0.2s ease-in-out;
+}
+
+// --- Styles ---
+
+// Container chính bao ngoài cùng
+.container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  // Sử dụng gradient nền tinh tế
+  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 50%, #a5b4fc 100%);
+  padding: 2rem; // Thêm padding lớn hơn
+}
+
+// Khung card chính
+.card {
+  display: flex;
+  flex-direction: column; // Mặc định xếp chồng trên mobile
+  background-color: $card-bg;
+  border-radius: 16px; // Bo góc lớn hơn
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15); // Đổ bóng mạnh hơn
+  max-width: 900px; // Chiều rộng tối đa lớn hơn cho 2 cột
+  width: 100%;
+  overflow: hidden; // Đảm bảo ảnh không tràn ra ngoài góc bo
+
+  // Media query cho màn hình lớn hơn (tablets và desktop)
+  @media (min-width: 768px) { // Tương đương md: của Tailwind
+    flex-direction: row; // Chuyển sang hàng ngang
+  }
+}
+
+// Phần cột chứa ảnh (bên trái)
+.imageSection {
+  display: none; // Mặc định ẩn trên mobile
+  position: relative; // Để định vị các lớp phủ bên trong
+  overflow: hidden; // Đảm bảo ảnh không tràn
+
+  img {
+    display: block; // Đảm bảo ảnh là block element
+    width: 100%;
+    height: 100%;
+    object-fit: cover; // Che phủ toàn bộ không gian
+  }
+
+  @media (min-width: 768px) {
+    display: block; // Hiển thị trên màn hình lớn
+    flex: 1 1 50%; // Chiếm 50% chiều rộng và có thể co giãn
+  }
+}
+
+// Lớp phủ gradient trên ảnh
+.imageOverlay {
+  position: absolute;
+  inset: 0; // Chiếm toàn bộ không gian của imageSection
+  background: linear-gradient(to top, rgba(79, 70, 229, 0.6) 0%, rgba(79, 70, 229, 0.1) 70%, transparent 100%);
+  pointer-events: none; // Cho phép click xuyên qua
+}
+
+// Phần text trên ảnh
+.imageText {
+  position: absolute;
+  bottom: 2.5rem;
+  left: 2.5rem;
+  color: white;
+  z-index: 10;
+  max-width: 80%; // Tránh text quá dài
+
+  h2 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    text-shadow: 1px 1px 3px rgba(0,0,0,0.3);
+  }
+
+  p {
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+  }
+}
+
+
+// Phần cột chứa form (bên phải)
+.formSection {
+  flex: 1 1 100%; // Mặc định chiếm 100%
+  padding: 2.5rem 2rem; // Padding
+  display: flex;
+  flex-direction: column;
+  justify-content: center; // Căn giữa nội dung theo chiều dọc
+
+  @media (min-width: 768px) {
+    flex: 1 1 50%; // Chiếm 50% trên màn hình lớn
+    padding: 3.5rem 3rem; // Padding lớn hơn trên desktop
+  }
+}
+
+// Tiêu đề "Đăng Nhập"
+.title {
+  color: $text-dark;
+  font-size: 2.1rem; // To hơn
+  font-weight: 700;   // Đậm hơn
+  margin-bottom: 0.75rem; // Khoảng cách dưới
+  text-align: center;
+
+  @media (min-width: 768px) {
+    text-align: left; // Căn trái trên desktop
+    font-size: 2.3rem;
+  }
+}
+
+// Mô tả phụ dưới tiêu đề
+.subtitle {
+  color: $text-medium;
+  font-size: 1rem;
+  margin-bottom: 2.5rem; // Tăng khoảng cách dưới
+  text-align: center;
+
+  @media (min-width: 768px) {
+    text-align: left;
+  }
+}
+
+
+// Form
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem; // Tăng khoảng cách giữa các input/button
+}
+
+// Label cho input
+.label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: $text-medium;
+  font-weight: 500;
+  font-size: 0.875rem; // 14px
+}
+
+// Input fields
+.input {
+  width: 100%;
+  padding: 0.875rem 1rem; // 14px 16px
+  border: 1px solid $border-color;
+  border-radius: 8px; // Bo góc nhiều hơn
+  box-sizing: border-box;
+  font-size: 0.95rem;
+  background-color: $input-bg; // Nền input hơi xám
+  color: $text-dark;
+  @include transition(border-color, box-shadow); // Áp dụng transition
+
+  &::placeholder {
+    color: $text-light;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: $primary-color;
+    box-shadow: 0 0 0 3px rgba($primary-color, 0.25); // Shadow rõ hơn khi focus
+  }
+
+  &:disabled {
+    background-color: #e5e7eb; // Màu nền khi disabled
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+}
+
+// Nút Submit
+.button {
+  padding: 0.875rem 1.25rem; // Padding lớn hơn
+  // Sử dụng gradient đẹp mắt
+  background: linear-gradient(to right, $primary-color, $secondary-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600; // Đậm hơn
+  margin-top: 0.5rem; // Khoảng cách trên nút
+  @include transition(background, transform, box-shadow);
+  box-shadow: 0 4px 10px rgba($primary-color, 0.2); // Thêm shadow nhẹ
+
+  &:hover:not(:disabled) {
+    // Hiệu ứng hover đổi gradient và nâng nhẹ
+    background: linear-gradient(to right, $primary-hover-color, $primary-color);
+    box-shadow: 0 6px 15px rgba($primary-color, 0.3);
+    transform: translateY(-2px);
+  }
+
+  &:active:not(:disabled) {
+    transform: translateY(0); // Trở lại vị trí khi nhấn
+    box-shadow: 0 2px 5px rgba($primary-color, 0.2);
+  }
+
+  &:disabled {
+    background: #d1d5db; // Màu xám đậm hơn khi disabled
+    cursor: not-allowed;
+    opacity: 0.8;
+    box-shadow: none;
+  }
+
+  // Style cho spinner bên trong button khi loading
+  .spinner {
+    display: inline-block; // Để nằm cùng dòng chữ
+    width: 1.25em; // Kích thước spinner
+    height: 1.25em;
+    vertical-align: -0.25em; // Căn chỉnh vị trí spinner
+    border: 2px solid rgba(255,255,255,0.3);
+    border-radius: 50%;
+    border-top-color: #fff; // Màu của phần quay
+    animation: spin 1s linear infinite;
+  }
+}
+
+// Keyframes cho animation của spinner
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
+// Thông báo lỗi
+.error {
+  color: $danger-color;
+  text-align: center;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+  min-height: 1.2em;
+}
+
+// Đoạn text chứa link đăng ký
+.link {
+  text-align: center;
+  margin-top: 2rem; // Tăng khoảng cách trên
+  font-size: 0.9rem;
+  color: $text-medium;
+
+  a {
+    color: $primary-color;
+    text-decoration: none;
+    font-weight: 600; // Đậm hơn
+    @include transition(color);
+
+    &:hover {
+      color: $primary-hover-color;
+      text-decoration: underline;
+    }
+  }
+}

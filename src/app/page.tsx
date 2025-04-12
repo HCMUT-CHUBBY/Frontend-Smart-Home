@@ -1,103 +1,98 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import React from 'react';
+import Link from 'next/link';
+import Image from 'next/image';
+import { useRouter } from 'next/navigation'; // Updated import for App Router
+import homeImage from '@/assests/home.png'; // Fixed typo in @/assets
+import Logo from '@/assests/logo.png'; // Fixed typo in @/assets
+import styles from '@/styles/Home.module.css'; // Fixed to use @/styles
+
+const HomePage: React.FC = () => {
+  const router = useRouter();
+
+  const handleLogin = () => {
+    router.push('/auth/login');
+  };
+
+  const handleSignUp = () => {
+    router.push('/auth/register');
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className={styles.container}>
+      {/* Head component is not needed in App Router - use metadata exports instead */}
+      
+      <header className={styles.header}>
+        <div className={styles.logo}>
+          <Image src={Logo} alt="Smartt Logo" width={100} height={40} />
+          <span className={styles.logoText}>Smartt</span>
+        </div>
+        <nav className={styles.navigation}>
+          <Link href="/product" className={styles.navLink}>
+            Product
+          </Link>
+          <div className={styles.dropdown}>
+            <span className={styles.navLink}>About</span>
+            <div className={styles.dropdownContent}>
+              <Link href="/about/team">
+                Our Team
+              </Link>
+              <Link href="/about/mission">
+                Our Mission
+              </Link>
+            </div>
+          </div>
+          <Link href="/contract" className={styles.navLink}>
+            Contract
+          </Link>
+          <Link href="/blog" className={styles.navLink}>
+            Blog
+          </Link>
+        </nav>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      <main className={styles.main}>
+        <div className={styles.heroSection}>
+          <div className={styles.heroContent}>
+            <h1 className={styles.title}>
+              <span className={styles.highlight}>Smart Home</span>
+            </h1>
+            <h2 className={styles.subtitle}>
+              Empowering Your Home,<br />
+              Enriching Your Life
+            </h2>
+            <p className={styles.description}>
+              Unlock the potential of your home with our revolutionary smart solution
+            </p>
+            <div className={styles.buttonGroup}>
+              <button 
+                className={styles.loginButton}
+                onClick={handleLogin}
+              >
+                Log in
+              </button>
+              <button 
+                className={styles.signupButton}
+                onClick={handleSignUp}
+              >
+                Sign up
+              </button>
+            </div>
+          </div>
+          <div className={styles.heroImage}>
+            <Image 
+              src={homeImage} 
+              alt="Smart Home Device" 
+              width={600}
+              height={500}
+              style={{ objectFit: "cover" }}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          </div>
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
     </div>
   );
-}
+};
+
+export default HomePage;
