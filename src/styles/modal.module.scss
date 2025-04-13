@@ -1,0 +1,120 @@
+/* src/styles/modal.module.scss */
+@import './variable'; // Import biến nếu bạn dùng
+
+// Lớp phủ nền mờ toàn màn hình
+.overlay {
+  position: fixed; // Cố định trên màn hình
+  inset: 0; // Chiếm toàn bộ không gian (top: 0, right: 0, bottom: 0, left: 0)
+  background-color: rgba(0, 0, 0, 0.6); // Màu đen mờ (thay thế bg-black bg-opacity-50)
+  backdrop-filter: blur(4px); // Hiệu ứng blur nền (thay thế backdrop-blur-sm)
+  z-index: 50; // Đảm bảo nằm trên cùng
+  display: flex;
+  justify-content: center; // Căn giữa theo chiều ngang
+  align-items: center;     // Căn giữa theo chiều dọc
+  padding: $spacing-md;    // Padding nhỏ xung quanh (thay thế p-4)
+
+  // Thêm hiệu ứng xuất hiện (tùy chọn)
+  opacity: 0;
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+// Khung nội dung chính của modal
+.modalContent {
+  background-color: $bg-card; // Nền trắng (hoặc màu card)
+  border-radius: $border-radius-lg; // Bo góc lớn hơn (thay thế rounded-lg)
+  box-shadow: $box-shadow-lg;   // Đổ bóng rõ hơn (thay thế shadow-xl)
+  width: 100%;                   // Chiếm toàn bộ chiều rộng cho phép
+  max-width: 550px;              // <<< ĐIỀU CHỈNH Ở ĐÂY ĐỂ MODAL "TO LÊN HƠN"
+                                 // Thử các giá trị: 600px, 700px, 800px...
+  overflow: hidden;              // Giữ nguyên để nội dung không tràn viền bo góc
+  position: relative;            // Để định vị nút đóng nếu cần
+  z-index: 51;                   // Cao hơn lớp phủ
+  display: flex;                 // Sử dụng flex để dễ dàng quản lý header/body/footer
+  flex-direction: column;
+  max-height: 90vh;              // Chiều cao tối đa, tránh tràn màn hình dọc
+
+  // Hiệu ứng xuất hiện (tùy chọn)
+  transform: scale(0.95);
+  opacity: 0;
+  animation: scaleIn 0.2s 0.1s ease-out forwards; // Có delay nhỏ
+
+  @media (prefers-color-scheme: dark) {
+    background-color: $dark-bg-card;
+  }
+}
+
+// Phần Header của modal
+.modalHeader {
+  display: flex;
+  justify-content: space-between; // Đẩy title và nút đóng ra 2 bên
+  align-items: center;
+  padding: $spacing-md $spacing-lg; // Padding (thay thế p-4)
+  border-bottom: 1px solid $border-color; // Đường kẻ dưới
+  flex-shrink: 0; // Không co lại
+
+  @media (prefers-color-scheme: dark) {
+    border-color: $dark-border-color;
+  }
+}
+
+// Tiêu đề modal
+.modalTitle {
+  font-size: 1.25rem; // Tương đương text-xl
+  font-weight: 600;   // Tương đương font-semibold
+  color: $text-primary;
+
+  @media (prefers-color-scheme: dark) {
+    color: $dark-text-primary;
+  }
+}
+
+// Nút đóng (X)
+.closeButton {
+  background: none;
+  border: none;
+  padding: $spacing-xs; // Padding nhỏ để dễ click
+  margin: -$spacing-xs; // Bù lại padding để căn chỉnh visual
+  color: $text-light;
+  cursor: pointer;
+  line-height: 1; // Tránh làm thay đổi chiều cao header
+  border-radius: 50%;
+  @include transition(color, background-color);
+
+  &:hover {
+    color: $text-primary;
+    background-color: darken($bg-card, 5%); // Nền nhẹ khi hover
+  }
+
+  svg { // Style cho SVG icon bên trong
+    width: 24px; // Tương đương h-6 w-6
+    height: 24px;
+    display: block; // Loại bỏ khoảng trắng dư thừa
+  }
+
+  @media (prefers-color-scheme: dark) {
+    color: $dark-text-secondary;
+     &:hover {
+      color: $dark-text-primary;
+      background-color: lighten($dark-bg-card, 5%);
+    }
+  }
+}
+
+// Phần Body của modal (chứa children)
+.modalBody {
+  padding: $spacing-lg; // Padding cho nội dung (thay thế p-6)
+  overflow-y: auto;    // Cho phép cuộn nếu nội dung dài
+  flex-grow: 1;       // Chiếm phần không gian còn lại theo chiều dọc
+}
+
+// --- Keyframes cho hiệu ứng (Tùy chọn) ---
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

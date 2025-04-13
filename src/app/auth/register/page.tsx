@@ -2,6 +2,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import styles from '@/styles/register.module.scss';
 
 export default function SignUp() {
   const [username, setUsername] = useState("");
@@ -26,69 +27,74 @@ export default function SignUp() {
         router.push("/auth/login");
       }
     } catch (error) {
-        setError(`Đăng ký thất bại. Lỗi: ${(error as Error).message}`);
-      }
+      setError(`Đăng ký thất bại. Lỗi: ${(error as Error).message}`);
+    }
   };
 
   return (
-    <div style={{ maxWidth: "400px", margin: "50px auto" }}>
-      <h1>Đăng Ký</h1>
-      <form onSubmit={handleSubmit}>
-        <label>
-          Username:
+    <div className={styles.container}>
+      <h1 className={styles.title}>Đăng Ký</h1>
+      <form onSubmit={handleSubmit} className={styles.form}>
+        <div className={styles.formGroup}>
+          <label htmlFor="username">Username:</label>
           <input
+            id="username"
             type="text"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            style={{ width: "100%", padding: "8px", margin: "10px 0" }}
+            className={styles.input}
           />
-        </label>
-        <br />
-        <label>
-          Password:
+        </div>
+        
+        <div className={styles.formGroup}>
+          <label htmlFor="password">Password:</label>
           <input
+            id="password"
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            style={{ width: "100%", padding: "8px", margin: "10px 0" }}
+            className={styles.input}
           />
-        </label>
-        <br />
-        <label>
-          First Name:
+        </div>
+        
+        <div className={styles.formGroup}>
+          <label htmlFor="firstName">First Name:</label>
           <input
+            id="firstName"
             type="text"
             value={firstName}
             onChange={(e) => setFirstName(e.target.value)}
-            style={{ width: "100%", padding: "8px", margin: "10px 0" }}
+            className={styles.input}
           />
-        </label>
-        <br />
-        <label>
-          Last Name:
+        </div>
+        
+        <div className={styles.formGroup}>
+          <label htmlFor="lastName">Last Name:</label>
           <input
+            id="lastName"
             type="text"
             value={lastName}
             onChange={(e) => setLastName(e.target.value)}
-            style={{ width: "100%", padding: "8px", margin: "10px 0" }}
+            className={styles.input}
           />
-        </label>
-        <br />
-        <label>
-          Phone Number:
+        </div>
+        
+        <div className={styles.formGroup}>
+          <label htmlFor="phoneNumber">Phone Number:</label>
           <input
+            id="phoneNumber"
             type="text"
             value={phoneNumber}
             onChange={(e) => setPhoneNumber(e.target.value)}
-            style={{ width: "100%", padding: "8px", margin: "10px 0" }}
+            className={styles.input}
           />
-        </label>
-        <br />
-        <button type="submit" style={{ padding: "10px 20px" }}>
+        </div>
+        
+        <button type="submit" className={styles.button}>
           Đăng Ký
         </button>
       </form>
-      {error && <p style={{ color: "red" }}>{error}</p>}
+      {error && <p className={styles.error}>{error}</p>}
     </div>
   );
 }

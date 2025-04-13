@@ -1,7 +1,9 @@
 // components/dashboard/DeviceDetailsModal.tsx
-import React from 'react';
+import React, { useState } from 'react';
+import { Lightbulb, Thermometer } from 'lucide-react';
 import Modal from '@/components/ui/Modal';
 import { Device } from '@/lib/types';
+import styles from '@/styles/DeviceDetailModal.module.scss';
 
 interface DeviceDetailsModalProps {
   isOpen: boolean;
@@ -9,52 +11,95 @@ interface DeviceDetailsModalProps {
   device: Device | null;
 }
 
-const DetailItem: React.FC<{ label: string; value: React.ReactNode }> = ({ label, value }) => (
-    <div className="py-2 sm:grid sm:grid-cols-3 sm:gap-4">
-        <dt className="text-sm font-medium text-gray-500 dark:text-gray-400">{label}</dt>
-        <dd className="mt-1 text-sm text-gray-900 dark:text-gray-100 sm:mt-0 sm:col-span-2 break-words">{value}</dd>
-    </div>
-);
+interface DetailItemProps {
+  label: string;
+  value: React.ReactNode;
+  isSensitive?: boolean;
+}
 
+const DetailItem: React.FC<DetailItemProps> = ({ label, value, isSensitive = false }) => {
+  const [showSensitive, setShowSensitive] = useState(false);
+  
+  return (
+    <div className={styles.detailItem}>
+      <div className={styles.detailLabel}>{label}</div>
+      <div className={styles.detailValue}>
+        {isSensitive ? (
+          <>
+            <span>{showSensitive ? value : String(value).substring(0, 5)}</span>
+            <span className={showSensitive ? '' : styles.maskedValue}></span>
+            <button 
+              className={styles.showButton} 
+              onClick={() => setShowSensitive(!showSensitive)}
+            >
+              {showSensitive ? 'Hide' : 'Show'}
+            </button>
+          </>
+        ) : (
+          value
+        )}
+      </div>
+    </div>
+  );
+};
 
 const DeviceDetailsModal: React.FC<DeviceDetailsModalProps> = ({ isOpen, onClose, device }) => {
   if (!device) return null;
-
+  
+  const Icon = device.type === 'TEMP' ? Thermometer : Lightbulb;
+  
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Device Details: ${device.feed}`}>
-      <div className="flow-root">
-          <dl className="-my-2 divide-y divide-gray-200 dark:divide-gray-700">
-             <DetailItem label="ID" value={device.id} />
-             <DetailItem label="Feed Name" value={device.feed} />
-             <DetailItem label="Type" value={device.type === 'TEMP' ? 'Temperature Sensor' : 'Light Control'} />
-              <DetailItem
-                label="Current State"
-                value={
-                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
-                         device.state === 'ON'
-                         ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-                         : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
-                     }`}>
-                         {device.state}
-                     </span>
-                }
-              />
-             <DetailItem label="Adafruit User" value={device.adaUsername} />
-             {/* Không nên hiển thị API Key đầy đủ vì lý do bảo mật */}
-             {/* <DetailItem label="Adafruit Key" value={device.adaApikey} /> */}
-             <DetailItem label="Config" value={<pre className="text-xs whitespace-pre-wrap">{JSON.stringify(device.deviceConfig, null, 2) || '{}'}</pre>} />
-             {/* Thêm các trường khác nếu cần */}
-          </dl>
-      </div>
-       <div className="mt-6 flex justify-end">
-            <button
-            type="button"
-            onClick={onClose}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
-          >
+    <Modal isOpen={isOpen} onClose={onClose} title="Device Details">
+      <div className={`${styles.modalContent} ${styles.animatedModal}`}>
+        <div className={styles.modalHeader}>
+          <div className={styles.headerIcon}>
+            <Icon size={18} />
+          </div>
+          <h2>Device Details</h2>
+        </div>
+        
+        <div className={styles.modalBody}>
+          <div className={styles.detailSection}>
+            <h3>Basic Information</h3>
+            <div className={styles.detailGrid}>
+              <DetailItem label="Name" value={device.feed} />
+              <DetailItem label="Type" value={device.type === 'TEMP' ? 'Temperature Sensor' : 'Light Control'} />
+              <DetailItem label="Status" value={
+                <span className={`${styles.statusBadge} ${device.state === 'ON' ? styles.on : styles.off}`}>
+                  {device.state}
+                </span>
+              } />
+              <DetailItem label="ID" value={device.id} />
+            </div>
+          </div>
+          
+          <div className={styles.detailSection}>
+            <h3>Connection Information</h3>
+            <div className={styles.detailGrid}>
+              <DetailItem label="Adafruit Username" value={device.adaUsername} />
+              {/* Không nên hiển thị API Key đầy đủ vì lý do bảo mật */}
+              <DetailItem label="API Key" value={device.adaApikey} isSensitive={true} />
+            </div>
+          </div>
+          
+          <div className={styles.detailSection}>
+            <h3>Device Configuration</h3>
+            <pre className={styles.configBlock}>
+              {JSON.stringify(device.deviceConfig, null, 2) || '{}'}
+            </pre>
+          </div>
+          {/* Thêm các trường khác nếu cần */}
+        </div>
+        
+        <div className={styles.modalFooter}>
+          <button className={styles.closeButton} onClick={onClose}>
             Close
           </button>
-       </div>
+          <button className={styles.actionButton}>
+            Edit Device
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 };

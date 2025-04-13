@@ -30,7 +30,7 @@ import AddDeviceModal from '@/components/dashboard/AddDeviceModal';
 import DeviceDetailsModal from '@/components/dashboard/DeviceDetailModal';
 import { toast, ToastContainer } from 'react-toastify'; // Ví dụ dùng react-toastify
 import 'react-toastify/dist/ReactToastify.css';
-
+import styles from '@/styles/DashBoard.module.scss'; // CSS module cho dashboard
 // Cài đặt: npm install react-toastify
 
 export default function DashboardPage() {
@@ -84,30 +84,23 @@ export default function DashboardPage() {
     }
   }, [status]); // Chỉ phụ thuộc vào status
 
-    const loadWeather = useCallback(async () => {
-    // Đọc lat/lon từ .env.local
-    const latString = process.env.NEXT_PUBLIC_WEATHER_LATITUDE;
-    const lonString = process.env.NEXT_PUBLIC_WEATHER_LONGITUDE;
+  const loadWeather = useCallback(async () => {
+    // Đọc city từ .env.local hoặc dùng giá trị mặc định
     const city = process.env.NEXT_PUBLIC_WEATHER_CITY || "Ho Chi Minh City";
 
-    // Chuyển đổi sang số, kiểm tra tính hợp lệ
-    const lat = latString ? parseFloat(latString) : NaN;
-    const lon = lonString ? parseFloat(lonString) : NaN;
-
-    if (isNaN(lat) || isNaN(lon)) {
-         console.warn("Weather latitude/longitude not configured correctly in .env.local");
-         return;
+    if (!city) {
+       console.warn("Weather city not configured correctly in .env.local (NEXT_PUBLIC_WEATHER_CITY)");
+       return;
     }
 
     try {
-      // Gọi hàm fetchWeather đã cập nhật
-      const weatherData = await fetchWeather(lat, lon, city);
-      setWeather(weatherData);
+       // Gọi hàm fetchWeather đã cập nhật với cityName
+       const weatherData = await fetchWeather(city); // Chỉ cần truyền city
+       setWeather(weatherData);
     } catch (error) {
-      console.error('Error fetching weather:', error);
-      // Cân nhắc hiển thị lỗi cho người dùng nếu cần
+       console.error('Error fetching weather:', error);
     }
-  }, []); 
+}, []); // Bỏ dependency lat/lon nếu không dùng nữa
 
   // --- WebSocket Handling ---
 
@@ -249,58 +242,69 @@ export default function DashboardPage() {
     }
   };
 
-  const handleToggleDevice = (device: Device) => {
-    if (!session) return;
+  // Bên trong component DashboardPage
 
-    const currentState = realtimeStates[device.id]?.state ?? device.state; // Lấy state mới nhất
-    const newState = currentState === 'ON' ? 'OFF' : 'ON';
+const handleToggleDevice = async (device: Device) => { // Thêm async
+  if (!session) {
+    toast.warn("Authentication required."); // Thông báo nếu chưa đăng nhập
+    return;
+  }
 
-    // Dùng WebSocket để gửi lệnh (như trong lib/websocket.ts)
-    const command: DeviceCommand = {
-        action: "set_state", // Backend cần xử lý action này
-        value: newState
-    };
-    console.log(`[WS] Publishing to ${device.id}:`, command);
-    publishToDevice(device.id, command);
+  const currentState = realtimeStates[device.id]?.state ?? device.state; // Lấy state hiện tại (ưu tiên realtime)
+  const newState = currentState === 'ON' ? 'OFF' : 'ON';
 
-    // Cập nhật trạng thái UI ngay lập tức (Optimistic Update)
-    // WebSocket message đến sẽ ghi đè lại nếu có khác biệt
-    setRealtimeStates(prev => ({
-        ...prev,
-        [device.id]: { ...prev[device.id], state: newState }
-    }));
+  // --- Bước 1: Cập nhật giao diện ngay lập tức (Optimistic Update) ---
+  setRealtimeStates(prev => ({
+    ...prev,
+    [device.id]: { ...(prev[device.id] || {}), state: newState } // Cập nhật state mới
+  }));
 
-    // === HOẶC: Dùng REST API PUT (ít real-time hơn) ===
-    /*
-    const updatedDeviceData: Partial<DeviceDTO> = {
-      state: newState,
-      // Giữ nguyên các trường khác nếu PUT yêu cầu gửi lại toàn bộ DTO
-      feed: device.feed,
-      type: device.type,
-      adaUsername: device.adaUsername,
-      adaApikey: device.adaApikey,
-      deviceConfig: device.deviceConfig
-    };
-    apiClient.put(`/devices/${device.id}`, updatedDeviceData)
-      .then(response => {
-        toast.success(`Device ${device.feed} turned ${newState}`);
-        // Cập nhật state từ response hoặc giữ optimistic update
-         setRealtimeStates(prev => ({
-            ...prev,
-            [device.id]: { ...prev[device.id], state: newState }
-        }));
-      })
-      .catch(error => {
-        console.error(`Error toggling device ${device.id}:`, error);
-        toast.error(`Failed to toggle device: ${error.response?.data?.message || error.message}`);
-        // Rollback optimistic update nếu cần
-        setRealtimeStates(prev => ({
-            ...prev,
-            [device.id]: { ...prev[device.id], state: currentState } // Khôi phục state cũ
-        }));
-      });
-    */
+  // --- Bước 2: Chuẩn bị dữ liệu để gửi lên API ---
+  // Lấy các trường cần thiết từ object 'device' và chỉ cập nhật 'state'
+  // Đảm bảo object 'device' của bạn có đủ các trường này!
+  const payload = {
+    feed: device.feed,
+    state: newState, // Trạng thái mới cần đặt
+    adaUsername: device.adaUsername,
+    adaApikey: device.adaApikey,
+    deviceConfig: device.deviceConfig || {}, // Đảm bảo deviceConfig là object, ít nhất là rỗng
+    // Thêm các trường khác nếu API PUT của bạn yêu cầu đầy đủ
+    // type: device.type, // Bỏ 'type' nếu API không yêu cầu như ví dụ JSON của bạn
   };
+
+  // --- Bước 3: Gọi API PUT ---
+  try {
+    console.log(`[API] Sending PUT to /devices/${device.id} with payload:`, payload);
+    await apiClient.put(`/devices/${device.id}`, payload); // Thêm await
+
+    // Nếu thành công, có thể hiện thông báo (không cần cập nhật lại state vì đã làm ở optimistic update)
+    toast.success(`Device '${device.feed}' turned ${newState}`);
+
+    // >>> TÙY CHỌN: Có nên giữ lại publish qua WebSocket không? <<<
+    // Nếu backend của bạn *chỉ* cập nhật qua PUT và *không* tự động gửi thông báo WebSocket sau đó,
+    // bạn có thể vẫn muốn publish qua WS ở đây để các client khác cập nhật UI ngay.
+    // Nếu backend *đã* tự gửi WS sau khi PUT thành công, thì dòng publishToDevice ở đây là không cần thiết.
+    // const command: DeviceCommand = { action: "set_state", value: newState };
+    // publishToDevice(device.id, command); // Cân nhắc có cần dòng này không
+
+  } catch (error: unknown) {
+    console.error(`[API] Error toggling device ${device.id}:`, error);
+
+    // Nếu gọi API thất bại, hiển thị lỗi
+    if (error instanceof Error) {
+      const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || error.message;
+      toast.error(`Failed to toggle device: ${errorMessage}`);
+    } else {
+      toast.error('Failed to toggle device: Unknown error occurred.');
+    }
+
+    // --- Bước 4: Khôi phục lại trạng thái UI (Rollback Optimistic Update) ---
+    setRealtimeStates(prev => ({
+      ...prev,
+      [device.id]: { ...(prev[device.id] || {}), state: currentState } // Quay lại trạng thái ban đầu
+    }));
+  }
+};
 
   const handleDeviceClick = (device: Device) => {
     // Lấy thông tin chi tiết nhất (có thể fetch lại hoặc dùng data hiện có)
@@ -346,66 +350,70 @@ export default function DashboardPage() {
   }
 
 
+ 
   return (
-    <div className="container mx-auto px-4 py-6">
-        <ToastContainer position="bottom-right" autoClose={3000} />
+    <div className={styles.dashboardContainer}> {/* Container chính của trang */}
+      <ToastContainer position="bottom-right" autoClose={3000} theme="colored" />
 
-        {/* Phần trên: Thời tiết và Widget khác (nếu có) */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div className="md:col-span-1">
-                 <WeatherWidget weather={weather} />
-            </div>
-             {/* Placeholder cho widget nhạc hoặc widget khác */}
-            {/* <div className="md:col-span-2 bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
-                <h2 className="text-lg font-semibold mb-2 dark:text-white">Music Player (Placeholder)</h2>
-                 Thêm nội dung widget nhạc ở đây nếu có
-            </div> */}
-        </div>
+      {/* Phần Widgets */}
+      <div className={styles.widgetsGrid}> {/* Lưới widgets */}
+         <div className={styles.widgetColSpan1}> {/* Ví dụ widget chiếm 1 cột */}
+             <WeatherWidget weather={weather} /> {/* Cần style WeatherWidget.module.scss */}
+         </div>
+         {/* Thêm các widget khác nếu cần, ví dụ: */}
+         {/* <div className={styles.widgetColSpan2}> // Widget chiếm 2 cột
+             <YourOtherWidget />
+         </div> */}
+      </div>
 
-        {/* Phần dưới: Danh sách thiết bị */}
-        <h2 className="text-2xl font-semibold mb-4 text-gray-800 dark:text-gray-200">My Devices</h2>
+      {/* Phần danh sách thiết bị */}
+      <h2 className={styles.deviceListTitle}>Thiết bị của tôi</h2>
+
+      {/* Lưới thiết bị hoặc thông báo khi không có thiết bị */}
+      <div className={styles.deviceGrid}> {/* Lưới thiết bị */}
         {devices.length === 0 && !showAddDeviceModal && (
-             <div className="text-center py-10 bg-white dark:bg-gray-800 rounded-lg shadow">
-                 <p className="mb-4 text-gray-500 dark:text-gray-400">You don't have any devices yet.</p>
-                 <button
-                    onClick={() => setShowAddDeviceModal(true)}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+           <div className={styles.noDevices}> {/* Box thông báo */}
+               <p>Bạn chưa có thiết bị nào.</p>
+               {/* Áp class riêng cho nút để style */}
+               <button
+                  onClick={() => setShowAddDeviceModal(true)}
+                  className={styles.addButton}
                 >
-                    Add Your First Device
-                </button>
-            </div>
+                  Thêm thiết bị đầu tiên
+               </button>
+           </div>
         )}
 
-        {devices.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {devices.map((device) => (
-                    <DeviceCard
-                        key={device.id}
-                        device={device}
-                        // Truyền state và value từ realtimeStates
-                        currentState={realtimeStates[device.id]?.state}
-                        currentValue={realtimeStates[device.id]?.value}
-                        onToggle={() => handleToggleDevice(device)}
-                        onClick={() => handleDeviceClick(device)}
-                    />
-                ))}
-            </div>
-        )}
+        {devices.length > 0 &&
+           devices.map((device) => (
+              <DeviceCard
+                 key={device.id}
+                 device={device}
+                 currentState={realtimeStates[device.id]?.state}
+                 currentValue={realtimeStates[device.id]?.value}
+                 onToggle={() => handleToggleDevice(device)}
+                 onClick={() => handleDeviceClick(device)}
+                 // Component DeviceCard cần import và sử dụng deviceCard.module.scss
+              />
+           ))}
+      </div>
 
-        {/* Modals */}
-        <AddDeviceModal
-            isOpen={showAddDeviceModal}
-            onClose={() => setShowAddDeviceModal(false)}
-            onSubmit={handleAddDevice}
-            defaultAdaUsername="thanghoia" // Giá trị mặc định bạn cung cấp
-            defaultAdaApiKey="aio_mLzM390pWwA0pNytdAJXFRFk8uA" // Giá trị mặc định bạn cung cấp
-        />
+      {/* Modals (Giữ nguyên) */}
+      <AddDeviceModal
+         isOpen={showAddDeviceModal}
+         onClose={() => setShowAddDeviceModal(false)}
+         onSubmit={handleAddDevice}
+         defaultAdaUsername={process.env.NEXT_PUBLIC_ADA_USERNAME || ''}
+         defaultAdaApiKey={process.env.NEXT_PUBLIC_ADA_API_KEY || ''}
+         // Component AddDeviceModal cần style riêng (ví dụ modal.module.scss)
+      />
 
-        <DeviceDetailsModal
-            isOpen={!!selectedDevice}
-            onClose={() => setSelectedDevice(null)}
-            device={selectedDevice}
-        />
+      <DeviceDetailsModal
+         isOpen={!!selectedDevice}
+         onClose={() => setSelectedDevice(null)}
+         device={selectedDevice}
+         // Component DeviceDetailsModal cần style riêng (ví dụ modal.module.scss)
+      />
     </div>
   );
 }

@@ -1,12 +1,13 @@
 // components/dashboard/AddDeviceModal.tsx
-import React, { useState, useEffect } from 'react';
-import Modal from '@/components/ui/Modal';
+import React, { useState, useEffect, FormEvent } from 'react';
+import Modal from '@/components/ui/Modal'; // Giữ nguyên component Modal gốc
 import { DeviceDTO } from '@/lib/types';
+import styles from '@/styles/AddDeviceModal.module.scss'; // <<< IMPORT SCSS MODULE
 
 interface AddDeviceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (deviceData: DeviceDTO) => Promise<void>; // onSubmit trả về Promise để xử lý loading
+  onSubmit: (deviceData: DeviceDTO) => Promise<void>;
   defaultAdaUsername: string;
   defaultAdaApiKey: string;
 }
@@ -22,7 +23,6 @@ const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Reset form khi modal đóng/mở
   useEffect(() => {
     if (isOpen) {
       setFeed('');
@@ -35,7 +35,7 @@ const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
     }
   }, [isOpen, defaultAdaUsername, defaultAdaApiKey]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     if (!feed.trim()) {
@@ -48,29 +48,31 @@ const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         feed: feed.trim(),
         type,
         state,
-        adaUsername: adaUsername.trim() || defaultAdaUsername, // Dùng default nếu rỗng
-        adaApikey: adaApiKey.trim() || defaultAdaApiKey,     // Dùng default nếu rỗng
-        // isSensor: true, // Đã thêm trong hàm handleAddDevice ở page
+        adaUsername: adaUsername.trim() || defaultAdaUsername,
+        adaApikey: adaApiKey.trim() || defaultAdaApiKey,
       });
-      // onClose(); // Đóng modal sẽ được gọi từ component cha sau khi submit thành công
+      // onClose(); // Cha sẽ gọi onClose sau khi submit thành công
     } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(err.message);
-      } else {
-        setError("An unexpected error occurred.");
-      }
+      // Hiển thị lỗi từ onSubmit nếu có, hoặc lỗi chung
+      const specificError = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+       setError(specificError || (err instanceof Error ? err.message : "An unexpected error occurred."));
+      console.error("Submit error in modal:", err); // Log lỗi chi tiết
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Sử dụng component Modal gốc, chỉ style phần form bên trong
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Add New Device">
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="text-red-500 text-sm">{error}</p>}
+      <form onSubmit={handleSubmit} className={styles.form}>
+        {/* Hiển thị lỗi */}
+        {error && <p className={styles.errorMessage}>{error}</p>}
+
+        {/* Feed Name */}
         <div>
-          <label htmlFor="feed" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            Feed Name <span className="text-red-500">*</span>
+          <label htmlFor="feed" className={styles.label}>
+            Feed Name <span className={styles.requiredStar}>*</span>
           </label>
           <input
             type="text"
@@ -78,45 +80,49 @@ const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
             value={feed}
             onChange={(e) => setFeed(e.target.value)}
             required
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            className={styles.input} // <<< Áp dụng class SCSS
             placeholder="e.g., living_room_light"
+            disabled={isLoading}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        {/* Type & State */}
+        <div className={styles.formGrid}> {/* <<< Dùng grid cho 2 cột */}
             <div>
-            <label htmlFor="type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Type
-            </label>
-            <select
-                id="type"
-                value={type}
-                onChange={(e) => setType(e.target.value as 'TEMP' | 'LIGHT')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-                <option value="TEMP">Temperature Sensor</option>
-                <option value="LIGHT">Light Control</option>
-            </select>
+              <label htmlFor="type" className={styles.label}>
+                  Type
+              </label>
+              <select
+                  id="type"
+                  value={type}
+                  onChange={(e) => setType(e.target.value as 'TEMP' | 'LIGHT')}
+                  className={styles.select} // <<< Áp dụng class SCSS
+                  disabled={isLoading}
+              >
+                  <option value="TEMP">Temperature Sensor</option>
+                  <option value="LIGHT">Light Control</option>
+              </select>
             </div>
             <div>
-            <label htmlFor="state" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Initial State
-            </label>
-            <select
-                id="state"
-                value={state}
-                onChange={(e) => setState(e.target.value as 'ON' | 'OFF')}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            >
-                <option value="OFF">OFF</option>
-                <option value="ON">ON</option>
-            </select>
+              <label htmlFor="state" className={styles.label}>
+                  Initial State
+              </label>
+              <select
+                  id="state"
+                  value={state}
+                  onChange={(e) => setState(e.target.value as 'ON' | 'OFF')}
+                  className={styles.select} // <<< Áp dụng class SCSS
+                  disabled={isLoading}
+              >
+                  <option value="OFF">OFF</option>
+                  <option value="ON">ON</option>
+              </select>
             </div>
         </div>
 
-
+        {/* Adafruit Username */}
         <div>
-          <label htmlFor="adaUsername" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor="adaUsername" className={styles.label}>
             Adafruit Username (Optional)
           </label>
           <input
@@ -124,39 +130,46 @@ const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
             id="adaUsername"
             value={adaUsername}
             onChange={(e) => setAdaUsername(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            placeholder={defaultAdaUsername}
+            className={styles.input} // <<< Áp dụng class SCSS
+            placeholder={defaultAdaUsername || "Using system default"}
+            disabled={isLoading}
           />
         </div>
 
+        {/* Adafruit API Key */}
         <div>
-          <label htmlFor="adaApiKey" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          <label htmlFor="adaApiKey" className={styles.label}>
             Adafruit IO Key (Optional)
           </label>
           <input
-            type="password" // Dùng password để ẩn key
+            type="password"
             id="adaApiKey"
             value={adaApiKey}
             onChange={(e) => setAdaApiKey(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            placeholder="Using default if empty"
+            className={styles.input} // <<< Áp dụng class SCSS
+            placeholder="Using system default if empty"
+            disabled={isLoading}
           />
         </div>
 
-        <div className="flex justify-end space-x-3 pt-4">
+        {/* Nút bấm */}
+        <div className={styles.buttonGroup}> {/* <<< Khu vực nút bấm */}
           <button
             type="button"
             onClick={onClose}
             disabled={isLoading}
-            className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500 disabled:opacity-50"
+            className={styles.cancelButton} // <<< Class nút Cancel
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={isLoading}
-            className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className={styles.submitButton} // <<< Class nút Submit
           >
+            {isLoading ? (
+               <span className={styles.spinner} role="status" aria-hidden="true"></span>
+            ) : null}
             {isLoading ? 'Adding...' : 'Add Device'}
           </button>
         </div>

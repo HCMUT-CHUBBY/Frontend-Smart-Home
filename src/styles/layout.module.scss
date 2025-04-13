@@ -1,0 +1,29 @@
+/* src/styles/layout.module.scss */
+@import './variable';
+
+.mainContentWrapper {
+    flex: 1;                 // Để chiếm không gian còn lại
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;        // Giữ nguyên nếu cần cho header/footer fixed sau này
+    margin-left: 260px;    // <<< QUAN TRỌNG NHẤT: Đẩy nội dung sang phải 260px
+  }
+  
+  /* Giữ lại các class khác như .layoutContainer, .mainContentArea nếu đúng */
+  .layoutContainer {
+      display: flex;
+      min-height: 100vh;
+      background-color: $bg-body;
+  }
+  
+  .mainContentArea {
+      flex: 1;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: $spacing-lg;
+      background-color: $bg-body;
+  
+      @media (min-width: $breakpoint-md) {
+        padding: $spacing-xl;
+      }
+  }

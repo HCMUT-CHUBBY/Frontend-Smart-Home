@@ -1,0 +1,248 @@
+// DeviceDetailsModal.module.scss
+// Assuming you have a variables file
+
+.modalContent {
+  display: flex;
+  flex-direction: column;
+  max-width: 600px;
+  width: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  padding: 18px 24px;
+  background: linear-gradient(to right, #6366f1, #8b5cf6);
+  color: white;
+  
+  h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 600;
+    flex: 1;
+  }
+  
+  .headerIcon {
+    margin-right: 12px;
+    background-color: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+.modalBody {
+  padding: 24px;
+  background-color: white;
+  
+  :global(.dark) & {
+    background-color: #1f2937;
+    color: #e5e7eb;
+  }
+}
+
+.detailSection {
+  margin-bottom: 24px;
+  
+  &:last-child {
+    margin-bottom: 0;
+  }
+  
+  h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0 0 16px 0;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    color: #4b5563;
+    
+    :global(.dark) & {
+      color: #d1d5db;
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+  }
+}
+
+.detailGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  
+  @media (max-width: 640px) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detailItem {
+  margin-bottom: 16px;
+  
+  @media (min-width: 640px) {
+    &:nth-child(odd) {
+      margin-right: 16px;
+    }
+  }
+}
+
+.detailLabel {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 4px;
+  
+  :global(.dark) & {
+    color: #9ca3af;
+  }
+}
+
+.detailValue {
+  font-size: 1rem;
+  font-weight: 500;
+  color: #1f2937;
+  word-break: break-word;
+  
+  :global(.dark) & {
+    color: #f3f4f6;
+  }
+}
+
+.configBlock {
+  background-color: #f3f4f6;
+  padding: 16px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 0.875rem;
+  overflow: auto;
+  max-height: 200px;
+  
+  :global(.dark) & {
+    background-color: #374151;
+    color: #e5e7eb;
+  }
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  
+  &.on {
+    background-color: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+    
+    :global(.dark) & {
+      background-color: rgba(16, 185, 129, 0.2);
+    }
+  }
+  
+  &.off {
+    background-color: rgba(156, 163, 175, 0.1);
+    color: #6b7280;
+    
+    :global(.dark) & {
+      background-color: rgba(156, 163, 175, 0.2);
+      color: #9ca3af;
+    }
+  }
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 24px;
+  background-color: #f9fafb;
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  
+  :global(.dark) & {
+    background-color: #111827;
+    border-color: rgba(255, 255, 255, 0.05);
+  }
+}
+
+.closeButton {
+  padding: 8px 16px;
+  background-color: #f3f4f6;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  color: #4b5563;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  
+  &:hover, &:focus {
+    background-color: #e5e7eb;
+  }
+  
+  :global(.dark) & {
+    background-color: #1f2937;
+    color: #d1d5db;
+    border-color: rgba(255, 255, 255, 0.1);
+    
+    &:hover, &:focus {
+      background-color: #374151;
+    }
+  }
+}
+
+.actionButton {
+  padding: 8px 16px;
+  background-color: #6366f1;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 12px;
+  
+  &:hover, &:focus {
+    background-color: #4f46e5;
+  }
+  
+  &:disabled {
+    background-color: #c7d2fe;
+    cursor: not-allowed;
+  }
+}
+
+// Animation for modal
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animatedModal {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+// Masking sensitive info like API keys
+.maskedValue {
+  font-family: monospace;
+  
+  &::after {
+    content: "••••••••";
+    margin-left: 4px;
+  }
+}
+
+.showButton {
+  background: none;
+  border: none;
+  color: #6366f1;
+  cursor: pointer;
+  font-size: 0.75rem;
+  margin-left: 8px;
+  text-decoration: underline;
+  
+  :global(.dark) & {
+    color: #818cf8;
+  }
+}

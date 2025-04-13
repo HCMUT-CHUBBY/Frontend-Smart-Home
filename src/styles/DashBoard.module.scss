@@ -1,0 +1,97 @@
+/* src/styles/dashboard.module.scss */
+@import './variable';
+
+.dashboardContainer {
+  // Có thể trống nếu chỉ dùng padding từ layout.module.scss
+  // Hoặc thêm style riêng nếu cần
+}
+
+// Lưới cho widgets (ví dụ: Thời tiết, Nhạc...)
+.widgetsGrid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr); // 1 cột mặc định
+  gap: $spacing-lg; // Khoảng cách giữa các widget
+  margin-bottom: $spacing-xl; // Khoảng cách dưới lưới widget
+
+  @media (min-width: $breakpoint-md) {
+    grid-template-columns: repeat(3, 1fr); // 3 cột trên màn hình vừa
+  }
+  @media (min-width: $breakpoint-lg) {
+     // Có thể điều chỉnh thêm cho màn hình lớn hơn
+  }
+}
+
+.widgetColSpan1 { // Class ví dụ cho widget chiếm 1 cột
+  // Không cần style gì đặc biệt nếu grid đã định nghĩa cột
+}
+.widgetColSpan2 { // Class ví dụ cho widget chiếm 2 cột
+  @media (min-width: $breakpoint-md) {
+    grid-column: span 2 / span 2;
+  }
+}
+
+
+// Tiêu đề danh sách thiết bị
+.deviceListTitle {
+  font-size: 1.5rem; // 24px
+  font-weight: 600;
+  color: $text-primary;
+  margin-bottom: $spacing-lg;
+
+  // Dark Mode
+  // @media (prefers-color-scheme: dark) { color: $dark-text-primary; }
+}
+
+// Lưới cho các card thiết bị
+.deviceGrid {
+  display: grid;
+  grid-template-columns: repeat(1, 1fr); // 1 cột mặc định
+  gap: $spacing-lg;
+
+  @media (min-width: 640px) { // sm breakpoint
+    grid-template-columns: repeat(2, 1fr); // 2 cột
+  }
+  @media (min-width: $breakpoint-lg) { // lg breakpoint
+    grid-template-columns: repeat(3, 1fr); // 3 cột
+  }
+   @media (min-width: $breakpoint-xl) { // xl breakpoint
+    grid-template-columns: repeat(4, 1fr); // 4 cột cho màn hình rất lớn
+  }
+}
+
+// Phần hiển thị khi không có thiết bị
+.noDevices {
+  text-align: center;
+  padding: $spacing-xl * 2 $spacing-xl;
+  background-color: $bg-card;
+  border-radius: $border-radius-lg;
+  box-shadow: $box-shadow-sm;
+  border: 1px dashed $border-color; // Viền đứt nét
+
+  p {
+    margin-bottom: $spacing-lg;
+    color: $text-secondary;
+  }
+
+  button {
+    padding: $spacing-sm $spacing-lg;
+    background-color: $primary-color;
+    color: $text-white;
+    border: none;
+    border-radius: $border-radius-md;
+    cursor: pointer;
+    font-weight: 500;
+    @include transition(background-color);
+
+    &:hover {
+      background-color: $primary-hover-color;
+    }
+  }
+
+  // Dark Mode
+  // @media (prefers-color-scheme: dark) {
+  //   background-color: $dark-bg-card;
+  //   border-color: $dark-border-color;
+  //   p { color: $dark-text-secondary; }
+  // }
+}

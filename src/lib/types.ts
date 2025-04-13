@@ -54,12 +54,19 @@ export interface DeviceSubscriptions {
 
 // Dữ liệu thời tiết (ví dụ từ OpenWeatherMap)
 export interface WeatherInfo {
-    city: string;
-    temperature: number; // từ temperature_2m
-    weatherCode: number; // WMO Weather code từ Open-Meteo
-    windSpeed: number; // từ wind_speed_10m
-    pressure: number; // từ pressure_msl hoặc surface_pressure
-    humidity: number; // từ relative_humidity_2m
+    city: string;           // Tên thành phố (từ response.data.name)
+    temperature: number;    // Nhiệt độ hiện tại (từ response.data.main.temp)
+    feelsLike: number;      // Nhiệt độ cảm nhận (từ response.data.main.feels_like)
+    tempMin?: number;       // Nhiệt độ thấp nhất (tùy chọn, từ response.data.main.temp_min)
+    tempMax?: number;       // Nhiệt độ cao nhất (tùy chọn, từ response.data.main.temp_max)
+    description: string;    // Mô tả thời tiết (từ response.data.weather[0].description)
+    iconCode: string;       // Mã icon thời tiết (từ response.data.weather[0].icon) - vd: "01d", "10n"
+    humidity: number;       // Độ ẩm (từ response.data.main.humidity)
+    pressure: number;       // Áp suất (từ response.data.main.pressure)
+    windSpeed: number;      // Tốc độ gió (từ response.data.wind.speed)
+    sunrise?: number;       // Thời gian mặt trời mọc (Unix timestamp, tùy chọn)
+    sunset?: number;        // Thời gian mặt trời lặn (Unix timestamp, tùy chọn)
+    timezone?: number;      // Độ lệch múi giờ so với UTC (giây)
   }
   
 

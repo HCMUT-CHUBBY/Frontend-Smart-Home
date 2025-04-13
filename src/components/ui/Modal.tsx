@@ -1,5 +1,6 @@
 // components/ui/Modal.tsx
-import React from 'react';
+import React, { useEffect } from 'react';
+import styles from '@/styles/modal.module.scss'; // <<< IMPORT SCSS MODULE
 
 interface ModalProps {
   isOpen: boolean;
@@ -9,25 +10,44 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
+  // Xử lý đóng modal bằng phím Escape (tùy chọn)
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
+    // Sử dụng class từ modal.module.scss
     <div
-      className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm z-50 flex justify-center items-center p-4"
+      className={styles.overlay} // <<< Class cho lớp phủ
       onClick={onClose} // Đóng khi click nền
+      role="dialog" // Thêm role cho accessibility
+      aria-modal="true"
+      aria-labelledby="modal-title" // Liên kết với tiêu đề
     >
       <div
-        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md overflow-hidden"
+        className={styles.modalContent} // <<< Class cho khung nội dung
         onClick={(e) => e.stopPropagation()} // Ngăn đóng khi click nội dung modal
       >
         {/* Header */}
-        <div className="flex justify-between items-center p-4 border-b dark:border-gray-700">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">{title}</h2>
+        <div className={styles.modalHeader}> {/* <<< Class cho header */}
+          <h2 id="modal-title" className={styles.modalTitle}>{title}</h2> {/* <<< Class cho title */}
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none"
+            className={styles.closeButton} // <<< Class cho nút đóng
+            aria-label="Close modal" // Thêm aria-label
           >
-            {/* X Icon (có thể dùng Lucide) */}
+            {/* X Icon */}
             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -35,8 +55,8 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }) => {
         </div>
 
         {/* Body */}
-        <div className="p-6">
-          {children}
+        <div className={styles.modalBody}> {/* <<< Class cho body */}
+          {children} {/* Nội dung form từ AddDeviceModal sẽ hiển thị ở đây */}
         </div>
       </div>
     </div>

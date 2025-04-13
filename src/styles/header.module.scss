@@ -1,0 +1,56 @@
+/* src/styles/header.module.scss */
+@import './variable'; // Import biến dùng chung (Quan trọng!)
+
+.header {
+  height: 64px; // Chiều cao header (tương đương h-16 của Tailwind)
+  background-color: $bg-header; // Màu nền từ biến
+  box-shadow: $box-shadow-sm;   // Đổ bóng nhẹ từ biến
+  border-bottom: 1px solid $border-color; // Đường kẻ dưới từ biến
+  display: flex;
+  align-items: center;          // Căn giữa các item theo chiều dọc
+  justify-content: space-between; // Đẩy các nhóm item sang hai bên
+  padding: 0 $spacing-lg;        // Padding trái/phải (tương đương px-6)
+  position: relative;            // Đảm bảo hoạt động đúng trong flex layout
+  z-index: 40;                   // Đặt z-index thấp hơn Sidebar (50) nếu cần
+  flex-shrink: 0;                // Ngăn header bị co lại khi nội dung dọc dài
+}
+
+.title {
+  font-size: 1.25rem; // Tương đương text-xl
+  font-weight: 600;   // Tương đương font-semibold
+  color: $text-primary; // Màu chữ chính từ biến
+  white-space: nowrap;  // Không xuống dòng
+}
+
+.controls { // div bao các nút/search/notification bên phải
+  display: flex;
+  align-items: center;
+  gap: $spacing-md; // Khoảng cách giữa các control (tương đương space-x-4)
+  // Thêm style cho các nút/icon bên trong .controls nếu bạn muốn
+  // Ví dụ:
+  // button {
+  //   background: none;
+  //   border: none;
+  //   padding: $spacing-sm;
+  //   border-radius: 50%;
+  //   cursor: pointer;
+  //   color: $text-secondary;
+  //   @include transition(background-color, color);
+  //   &:hover {
+  //     background-color: darken($bg-header, 5%);
+  //     color: $text-primary;
+  //   }
+  // }
+}
+
+// Ví dụ thêm Dark Mode (nếu bạn cấu hình)
+// @media (prefers-color-scheme: dark) {
+//   .header {
+//     background-color: $dark-bg-header;
+//     border-color: $dark-border-color;
+//   }
+//   .title {
+//     color: $dark-text-primary;
+//   }
+//   // ... style cho controls ở dark mode ...
+// }

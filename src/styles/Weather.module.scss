@@ -1,0 +1,98 @@
+/* src/styles/weatherWidget.module.scss */
+@import './variable';
+
+.weatherWidget {
+  background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%); // Gradient nền
+  color: $text-white;
+  border-radius: $border-radius-lg;
+  padding: $spacing-lg;
+  box-shadow: $box-shadow-md;
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md; // Khoảng cách giữa phần chính và chi tiết
+}
+
+.loading {
+  text-align: center;
+  padding: $spacing-xl 0;
+  color: rgba($text-white, 0.8);
+}
+
+.mainInfo {
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  padding-bottom: $spacing-md;
+}
+
+.location {
+  margin-bottom: $spacing-xs;
+}
+
+.city {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.tempAndIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: $spacing-sm;
+  margin: $spacing-sm 0;
+}
+
+.weatherIcon {
+  width: 60px; // Kích thước icon lớn
+  height: 60px;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); // Đổ bóng cho icon
+}
+
+.temperature {
+  font-size: 3rem; // Nhiệt độ lớn
+  font-weight: 700;
+  line-height: 1;
+}
+
+.description {
+  font-size: 1rem;
+  font-weight: 500;
+  color: rgba($text-white, 0.9);
+  margin-top: $spacing-xs;
+}
+
+.feelsLike {
+   font-size: 0.9rem;
+   color: rgba($text-white, 0.8);
+   margin-top: $spacing-xs;
+}
+
+.details {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr); // 3 cột chi tiết
+  gap: $spacing-sm;
+  text-align: center;
+}
+
+.detailItem {
+  display: flex;
+  flex-direction: column; // Xếp icon, value, label theo cột
+  align-items: center;
+  gap: $spacing-xs / 2;
+  font-size: 0.9rem;
+
+  .detailIcon {
+    width: 18px;
+    height: 18px;
+    color: rgba($text-white, 0.8);
+    margin-bottom: $spacing-xs / 2;
+  }
+
+  .detailLabel {
+    font-size: 0.75rem;
+    color: rgba($text-white, 0.7);
+    text-transform: uppercase;
+  }
+}
+
+// Dark mode không cần nhiều thay đổi vì nền đã là gradient
+// @media (prefers-color-scheme: dark) { ... }
