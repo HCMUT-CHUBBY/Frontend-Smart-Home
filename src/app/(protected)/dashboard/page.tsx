@@ -296,7 +296,9 @@ export default function DashboardPage() {
     }));
   
     // --- Bước 2: Gửi lệnh qua WebSocket ---
-    const command: DeviceCommand = { action: "set_state", value: newState };
+    // Gửi action là "TOGGLE" thay vì "set_state"
+// Vẫn giữ lại value vì backend có thể cần nó (hoặc bỏ qua nếu không cần)
+    const command: DeviceCommand = { action: "TOGGLE", value: newState };
     console.log(`[WS] Sending command to ${device.id}:`, command);
     try {
         publishToDevice(device.id, command); // <<< Gọi hàm gửi WS
