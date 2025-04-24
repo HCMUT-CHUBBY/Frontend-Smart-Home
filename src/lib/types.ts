@@ -10,7 +10,7 @@ export interface Device {
   type: "TEMP" | "LIGHT"; 
   adaUsername: string;
   adaApikey: string;
-  deviceConfig: Record<string, string | number | boolean>; 
+  deviceConfig: Record<string, string[]>;
 }
 
 export interface DeviceDTO {
@@ -26,7 +26,7 @@ export interface DeviceDTO {
   state: "ON" | "OFF";           // <<< BẮT BUỘC (Vốn đã vậy, string "ON"/"OFF" là hợp lệ)
   adaUsername: string;           // <<< BẮT BUỘC
   adaApikey: string;             // <<< BẮT BUỘC
-  deviceConfig: Record<string, string | number | boolean>;  // <<< Đổi thành 'any' hoặc 'unknown' nếu có thể lưu object phức tạp, 
+  deviceConfig: Record<string, string >;  // <<< Đổi thành 'any' hoặc 'unknown' nếu có thể lưu object phức tạp, 
                                        // hoặc giữ nguyên nếu chỉ lưu giá trị đơn giản. Vẫn để optional.
 }
 
@@ -38,7 +38,24 @@ export interface ApiResponse<T> {
   message: string;
   data: T;
 }
+export interface PasswordDTO {
+  oldPassword: string;     // <<< Đổi tên từ currentPassword
+  newPassword: string;
+  confirmPassword: string; // <<< Thêm trường này
+}
 
+
+// Interface cho dữ liệu gửi lên khi cập nhật profile (ví dụ)
+export interface ProfileUpdateDTO {
+    name: string;
+    // Thêm các trường khác nếu API cho phép cập nhật (vd: avatar)
+}
+
+// Interface cho dữ liệu gửi lên khi lưu tùy chọn (ví dụ)
+export interface PreferencesUpdateDTO {
+    theme: 'light' | 'dark';
+    emailNotifications: boolean;
+}
 
 export interface CustomSession extends Session {
   user: {
@@ -60,7 +77,28 @@ export interface DeviceCommand {
 export interface DeviceSubscriptions {
     [deviceId: string]: StompSubscription | null;
 }
+export interface DeviceLogDTO {
+  dateTime: string; // Nhận về dưới dạng chuỗi ISO 8601
+  deviceId: string;
+  userId: number | null; // Kiểu Long trong Java có thể là null
+  value: string; // Giá trị log (luôn là string từ backend DTO)
+  state: string | null; // Trạng thái lúc log (String trong Java, có thể null)
+}
 
+// Interface cho dữ liệu phân trang nhận về từ API
+// Dựa trên cấu trúc Page của Spring Boot và cách PageDTO có thể được tạo ra
+export interface PageDTO<T> {
+  content: T[]; // Mảng chứa dữ liệu của trang hiện tại (ví dụ: DeviceLogDTO[])
+  pageNo: number; // Số trang hiện tại (thường bắt đầu từ 0)
+  pageSize: number; // Kích thước trang
+  totalElements: number; // Tổng số phần tử khớp điều kiện
+  totalPages: number; // Tổng số trang
+  last: boolean; // true nếu là trang cuối cùng
+  // Có thể thêm các trường khác nếu backend PageDTO trả về:
+  // first?: boolean;
+  // sort?: any;
+  // numberOfElements?: number;
+}
 // Dữ liệu thời tiết (ví dụ từ OpenWeatherMap)
 export interface WeatherInfo {
     city: string;           // Tên thành phố (từ response.data.name)
