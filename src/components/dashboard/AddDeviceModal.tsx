@@ -50,6 +50,8 @@ const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
         state,
         adaUsername: adaUsername.trim() || defaultAdaUsername,
         adaApikey: adaApiKey.trim() || defaultAdaApiKey,
+        isSensor: type === 'TEMP', // Example logic to determine if it's a sensor
+        deviceConfig: {}, // Provide a default or appropriate configuration object
       });
       // onClose(); // Cha sẽ gọi onClose sau khi submit thành công
     } catch (err: unknown) {
@@ -66,6 +68,9 @@ const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Add New Device">
       <form onSubmit={handleSubmit} className={styles.form}>
+        <div className="mb-4 p-3 bg-yellow-100 border-l-4 border-yellow-500 text-yellow-800 text-sm rounded-md">
+          <p><strong>Lưu ý quan trọng:</strong> Bạn cần truy cập <a href="https://io.adafruit.com/" target="_blank" rel="noopener noreferrer" className="underline font-medium">Adafruit IO</a> và <strong>tạo Feed</strong> với tên chính xác mà bạn sẽ nhập vào ô &quot;Feed Name&quot; bên dưới trước khi thêm thiết bị tại đây.</p>
+        </div>
         {/* Hiển thị lỗi */}
         {error && <p className={styles.errorMessage}>{error}</p>}
 

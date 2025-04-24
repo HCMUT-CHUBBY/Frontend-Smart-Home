@@ -16,12 +16,14 @@
 }
 
 .title {
-  font-size: 1.25rem; // Tương đương text-xl
-  font-weight: 600;   // Tương đương font-semibold
-  color: $text-primary; // Màu chữ chính từ biến
-  white-space: nowrap;  // Không xuống dòng
-}
-
+    font-size: 1.25rem; // Tương đương text-xl
+    font-weight: 600;   // Tương đương font-semibold
+    color: $text-primary; // Màu chữ chính từ biến
+    white-space: nowrap;
+    display: flex;
+    justify-content: center; // Căn giữa title theo hướng ngang
+    align-items: center; // Căn giữa title theo hướng dọc
+  }
 .controls { // div bao các nút/search/notification bên phải
   display: flex;
   align-items: center;

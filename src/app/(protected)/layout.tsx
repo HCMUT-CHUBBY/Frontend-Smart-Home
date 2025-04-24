@@ -5,30 +5,29 @@ import React, { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/layout/Sidebar';
-import Header from '@/components/layout/Header'; // Giả định có component Header
-import styles from '@/styles/layout.module.scss'; // <<< THÊM DÒNG IMPORT NÀY
+import Header from '@/components/layout/Header'; 
+import styles from '@/styles/layout.module.scss'; 
 
-export default function ProtectedLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  console.log('[ProtectedLayout] Status:', status, 'Session:', session); // Thêm log này
+
   useEffect(() => {
-    // Nếu chưa load xong hoặc chưa đăng nhập, chuyển hướng về trang login
+    console.log('[ProtectedLayout] useEffect running. Status:', status); // Log khi effect chạy
     if (status === 'unauthenticated') {
+      console.log('[ProtectedLayout] Redirecting to login...');
       router.push('/auth/login');
     }
   }, [status, router]);
 
-  // Hiển thị loading hoặc null nếu chưa xác thực xong
   if (status === 'loading') {
-    // Thay thế bằng component loading nếu muốn đẹp hơn
+    console.log('[ProtectedLayout] Rendering Loading state...');
     return <div className="flex items-center justify-center h-screen text-xl">Loading...</div>;
   }
 
+ 
   // Chỉ render layout khi đã xác thực thành công
   if (status === 'authenticated') {
     return (

@@ -9,7 +9,7 @@ const Sidebar = () => {
   const pathname = usePathname();
   const { data: session, status } = useSession();
 
-  console.log("Sidebar - Session:", session, "Status:", status);
+  console.log("Sidebar - Session:", session, "Status:", status); // Log để kiểm tra
 
   const menuItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },

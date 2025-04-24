@@ -13,16 +13,25 @@ export interface Device {
   deviceConfig: Record<string, string | number | boolean>; 
 }
 
-
 export interface DeviceDTO {
-  isSensor?: boolean; 
-  type: "TEMP" | "LIGHT";
-  feed: string;
-  state: "ON" | "OFF";
-  adaUsername?: string;
-  adaApikey?: string;
-  deviceConfig?: Record<string, string | number | boolean>;
+  // Thêm id là optional vì khi POST (tạo mới) sẽ không có id
+  id?: string; 
+
+  // Các trường bắt buộc gửi lên khi POST/PUT theo backend DTO
+  isSensor: boolean;             // <<< BẮT BUỘC
+  type: "TEMP" | "LIGHT" | string; // <<< Có thể giữ enum HOẶC đổi thành string để khớp backend
+                                  // Giữ enum giúp frontend kiểm soát tốt hơn, 
+                                  // khi gửi đi giá trị vẫn là string ("TEMP" hoặc "LIGHT")
+  feed: string;                  // <<< BẮT BUỘC (Vốn đã vậy)
+  state: "ON" | "OFF";           // <<< BẮT BUỘC (Vốn đã vậy, string "ON"/"OFF" là hợp lệ)
+  adaUsername: string;           // <<< BẮT BUỘC
+  adaApikey: string;             // <<< BẮT BUỘC
+  deviceConfig: Record<string, string | number | boolean>;  // <<< Đổi thành 'any' hoặc 'unknown' nếu có thể lưu object phức tạp, 
+                                       // hoặc giữ nguyên nếu chỉ lưu giá trị đơn giản. Vẫn để optional.
 }
+
+// Interface Device và các interface khác giữ nguyên
+
 
 
 export interface ApiResponse<T> {
@@ -70,7 +79,7 @@ export interface WeatherInfo {
   }
   
 
-// Cập nhật State của thiết bị từ WebSocket
+
 export interface DeviceRealtimeState {
     [deviceId: string]: {
         state?: "ON" | "OFF";

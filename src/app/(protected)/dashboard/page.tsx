@@ -2,8 +2,11 @@
 "use client";
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import { StompSubscription } from '@stomp/stompjs';
+
+
+import axios from 'axios';
+import YouTube, { YouTubePlayer, YouTubeProps } from 'react-youtube'; 
+import { SkipBack, SkipForward, Play, Pause, Volume2, VolumeX } from 'lucide-react'; 
 
 import apiClient, { fetchWeather } from '@/lib/apiClient';
 import {
@@ -35,7 +38,7 @@ import styles from '@/styles/DashBoard.module.scss'; // CSS module cho dashboard
 
 export default function DashboardPage() {
   const { data: session, status } = useSession() as { data: CustomSession | null; status: 'loading' | 'authenticated' | 'unauthenticated' };
-  const router = useRouter();
+ 
 
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,10 +47,10 @@ export default function DashboardPage() {
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [realtimeStates, setRealtimeStates] = useState<DeviceRealtimeState>({});
 
-  // Dùng useRef để lưu subscriptions mà không làm re-render khi thay đổi
+
   const subscriptionsRef = useRef<DeviceSubscriptions>({});
 
-  // --- Fetching Data ---
+ 
 
   const loadDevices = useCallback(async () => {
     if (status !== 'authenticated') return;
@@ -57,10 +60,10 @@ export default function DashboardPage() {
       if (response.data && response.data.data) {
         setDevices(response.data.data);
         if (response.data.data.length === 0) {
-          // Không có thiết bị nào, hiện modal thêm mới
+          
           setShowAddDeviceModal(true);
         } else {
-           // Khởi tạo trạng thái realtime ban đầu từ dữ liệu fetch
+           
            const initialStates: DeviceRealtimeState = {};
            response.data.data.forEach(dev => {
                initialStates[dev.id] = { state: dev.state };
@@ -68,7 +71,7 @@ export default function DashboardPage() {
            setRealtimeStates(initialStates);
         }
       } else {
-        setDevices([]); // Đặt là mảng rỗng nếu API trả về cấu trúc không mong đợi
+        setDevices([]); 
       }
     } catch (error: unknown) {
       console.error('Error fetching devices:', error);
@@ -85,7 +88,7 @@ export default function DashboardPage() {
   }, [status]); // Chỉ phụ thuộc vào status
 
   const loadWeather = useCallback(async () => {
-    // Đọc city từ .env.local hoặc dùng giá trị mặc định
+    
     const city = process.env.NEXT_PUBLIC_WEATHER_CITY || "Ho Chi Minh City";
 
     if (!city) {
@@ -94,44 +97,51 @@ export default function DashboardPage() {
     }
 
     try {
-       // Gọi hàm fetchWeather đã cập nhật với cityName
-       const weatherData = await fetchWeather(city); // Chỉ cần truyền city
+       
+       const weatherData = await fetchWeather(city);
        setWeather(weatherData);
     } catch (error) {
        console.error('Error fetching weather:', error);
     }
-}, []); // Bỏ dependency lat/lon nếu không dùng nữa
+}, []);
 
-  // --- WebSocket Handling ---
+ 
 
   const handleWebSocketMessage = useCallback((deviceId: string, messageBody: string) => {
     console.log(`[WS] Received message for ${deviceId}:`, messageBody);
     try {
-        // Backend trả về giá trị cuối cùng từ Adafruit qua @SendTo khi subscribe
-        // Và có thể trả về object JSON khi có cập nhật trạng thái thực sự?
-        // -> Cần xác định rõ định dạng message từ WebSocket để xử lý chính xác
         let newState: "ON" | "OFF" | undefined = undefined;
         let newValue: string | number | undefined = undefined;
+        let isErrorMessage = false;
 
-        // Cố gắng parse JSON trước
-        try {
-            const parsedData = JSON.parse(messageBody);
-            if (parsedData && typeof parsedData === 'object') {
-                if (parsedData.state && (parsedData.state === "ON" || parsedData.state === "OFF")) {
-                   newState = parsedData.state;
+        
+        if (messageBody.startsWith("Error:")) {
+            console.error(`[WS] Backend Error for ${deviceId}: ${messageBody}`);
+            isErrorMessage = true;
+            
+            newValue = messageBody; // Ví dụ: hiển thị lỗi trong phần giá trị
+            newState = undefined; // Hoặc đặt state về trạng thái không xác định
+            
+        }
+        
+        else { 
+            try {
+                const parsedData = JSON.parse(messageBody);
+                // ... (phần parse JSON và xử lý ON/OFF/value như cũ) ...
+                 if (parsedData && typeof parsedData === 'object') {
+                     if (parsedData.state && (parsedData.state === "ON" || parsedData.state === "OFF")) {
+                         newState = parsedData.state;
+                     }
+                     if (parsedData.value !== undefined) {
+                         newValue = parsedData.value;
+                     }
+                 }
+            } catch {
+                if (messageBody === "ON" || messageBody === "OFF") {
+                    newState = messageBody;
+                } else {
+                    newValue = isNaN(Number(messageBody)) ? messageBody : Number(messageBody);
                 }
-                // Xử lý thêm các trường khác nếu có (ví dụ: value cho sensor)
-                if (parsedData.value !== undefined) {
-                    newValue = parsedData.value;
-                }
-            }
-        } catch {
-            // Nếu không phải JSON, giả sử nó là trạng thái ON/OFF hoặc giá trị sensor đơn giản
-            if (messageBody === "ON" || messageBody === "OFF") {
-                newState = messageBody;
-            } else {
-                 // Có thể là giá trị sensor (số hoặc chuỗi)
-                 newValue = isNaN(Number(messageBody)) ? messageBody : Number(messageBody);
             }
         }
 
@@ -139,16 +149,18 @@ export default function DashboardPage() {
         setRealtimeStates(prevStates => ({
             ...prevStates,
             [deviceId]: {
-                ...prevStates[deviceId], // Giữ lại state cũ nếu có
-                ...(newState !== undefined && { state: newState }), // Cập nhật state nếu có
-                ...(newValue !== undefined && { value: newValue }), // Cập nhật value nếu có
+                ...prevStates[deviceId],
+                ...(newState !== undefined && { state: newState }),
+                ...(newValue !== undefined && { value: newValue }), // Cập nhật cả state và value
+                // Nếu là lỗi, có thể muốn ghi đè state cũ
+                 ...(isErrorMessage && { state: undefined }) // Ví dụ: Xóa state nếu có lỗi
             }
         }));
 
     } catch (error) {
         console.error(`[WS] Error processing message for ${deviceId}:`, error);
     }
-  }, []); // Không có dependency ngoài
+}, []);
 
   const setupWebSocket = useCallback(() => {
     if (status === 'authenticated' && session?.user?.accessToken && devices && devices.length > 0) {
@@ -222,89 +234,84 @@ export default function DashboardPage() {
   // --- Event Handlers ---
 
   const handleAddDevice = async (newDeviceData: DeviceDTO) => {
-    if (!session) return;
-    // Thêm isSensor=true nếu backend yêu cầu cho POST
-    const dataToSend = { ...newDeviceData, isSensor: true, deviceConfig: {} };
+    if (!session) {
+       toast.warn("Authentication required.");
+       return;
+    }
+    // Giả sử isSensor và deviceConfig được xử lý ở backend hoặc không cần thiết khi POST
+    const dataToSend: DeviceDTO = { ...newDeviceData };
     console.log("Adding device:", dataToSend);
+ 
     try {
-      const response = await apiClient.post<ApiResponse<{ message: string }>>('/devices', dataToSend);
-      toast.success(response.data.message || 'Device added successfully!');
-      setShowAddDeviceModal(false);
-      await loadDevices(); // Tải lại danh sách thiết bị
-      // WebSocket sẽ tự động được thiết lập lại trong useEffect khi `devices` thay đổi
+      const response = await apiClient.post<ApiResponse<unknown>>('/devices', dataToSend);
+      toast.success(response.data?.message || 'Device added successfully!');
+      setShowAddDeviceModal(false); // <<< Đóng modal KHI THÀNH CÔNG
+      await loadDevices();
+ 
     } catch (error: unknown) {
       console.error('Error adding device:', error);
-      if (error instanceof Error) {
-        toast.error(`Failed to add device: ${(error as { response?: { data?: { message?: string } } })?.response?.data?.message || error.message}`);
-      } else {
-        toast.error('Failed to add device: Unknown error occurred.');
+      let userErrorMessage = 'Failed to add device: Unknown error occurred.'; // Lỗi mặc định
+ 
+      // --- KIỂM TRA LỖI FEED NOT FOUND ---
+      if (axios.isAxiosError(error) && error.response) {
+        const responseData = error.response.data;
+        // Chuỗi message này cần khớp với message thực tế backend trả về
+        const responseMessage = responseData?.message || JSON.stringify(responseData);
+        const feedName = dataToSend.feed || 'provided'; // Lấy tên feed đã nhập
+ 
+        if (error.response.status === 400 && responseMessage?.toLowerCase().includes("feed not found")) { // <<< Điều chỉnh chuỗi kiểm tra nếu cần
+           userErrorMessage = `Lỗi: Feed '${feedName}' không tồn tại trên Adafruit IO. Vui lòng tạo Feed thủ công trên io.adafruit.com trước khi thêm.`;
+        } else if (error.response.status === 400 && responseMessage?.toLowerCase().includes("already exists")) { // Ví dụ lỗi khác
+            userErrorMessage = `Lỗi: Thiết bị với Feed '${feedName}' (hoặc ID tương tự) đã tồn tại.`;
+        }
+        else {
+           userErrorMessage = `Failed to add device: ${responseMessage}`;
+        }
+      } else if (error instanceof Error) {
+        userErrorMessage = `Failed to add device: ${error.message}`;
       }
+      // --- KẾT THÚC KIỂM TRA LỖI ---
+ 
+      toast.error(userErrorMessage);
+      // *** Quan trọng: KHÔNG đóng modal khi lỗi ***
+      // setShowAddDeviceModal(false);
     }
+    // Không cần setIsLoading ở đây nếu modal tự quản lý loading state
   };
-
   // Bên trong component DashboardPage
 
-const handleToggleDevice = async (device: Device) => { // Thêm async
-  if (!session) {
-    toast.warn("Authentication required."); // Thông báo nếu chưa đăng nhập
-    return;
-  }
-
-  const currentState = realtimeStates[device.id]?.state ?? device.state; // Lấy state hiện tại (ưu tiên realtime)
-  const newState = currentState === 'ON' ? 'OFF' : 'ON';
-
-  // --- Bước 1: Cập nhật giao diện ngay lập tức (Optimistic Update) ---
-  setRealtimeStates(prev => ({
-    ...prev,
-    [device.id]: { ...(prev[device.id] || {}), state: newState } // Cập nhật state mới
-  }));
-
-  // --- Bước 2: Chuẩn bị dữ liệu để gửi lên API ---
-  // Lấy các trường cần thiết từ object 'device' và chỉ cập nhật 'state'
-  // Đảm bảo object 'device' của bạn có đủ các trường này!
-  const payload = {
-    feed: device.feed,
-    state: newState, // Trạng thái mới cần đặt
-    adaUsername: device.adaUsername,
-    adaApikey: device.adaApikey,
-    deviceConfig: device.deviceConfig || {}, // Đảm bảo deviceConfig là object, ít nhất là rỗng
-    // Thêm các trường khác nếu API PUT của bạn yêu cầu đầy đủ
-    // type: device.type, // Bỏ 'type' nếu API không yêu cầu như ví dụ JSON của bạn
-  };
-
-  // --- Bước 3: Gọi API PUT ---
-  try {
-    console.log(`[API] Sending PUT to /devices/${device.id} with payload:`, payload);
-    await apiClient.put(`/devices/${device.id}`, payload); // Thêm await
-
-    // Nếu thành công, có thể hiện thông báo (không cần cập nhật lại state vì đã làm ở optimistic update)
-    toast.success(`Device '${device.feed}' turned ${newState}`);
-
-    // >>> TÙY CHỌN: Có nên giữ lại publish qua WebSocket không? <<<
-    // Nếu backend của bạn *chỉ* cập nhật qua PUT và *không* tự động gửi thông báo WebSocket sau đó,
-    // bạn có thể vẫn muốn publish qua WS ở đây để các client khác cập nhật UI ngay.
-    // Nếu backend *đã* tự gửi WS sau khi PUT thành công, thì dòng publishToDevice ở đây là không cần thiết.
-    // const command: DeviceCommand = { action: "set_state", value: newState };
-    // publishToDevice(device.id, command); // Cân nhắc có cần dòng này không
-
-  } catch (error: unknown) {
-    console.error(`[API] Error toggling device ${device.id}:`, error);
-
-    // Nếu gọi API thất bại, hiển thị lỗi
-    if (error instanceof Error) {
-      const errorMessage = (error as { response?: { data?: { message?: string } } })?.response?.data?.message || error.message;
-      toast.error(`Failed to toggle device: ${errorMessage}`);
-    } else {
-      toast.error('Failed to toggle device: Unknown error occurred.');
+  const handleToggleDevice = (device: Device) => { // Bỏ async nếu chỉ dùng WS
+    if (!session) {
+      toast.warn("Authentication required.");
+      return;
     }
-
-    // --- Bước 4: Khôi phục lại trạng thái UI (Rollback Optimistic Update) ---
+  
+    const currentState = realtimeStates[device.id]?.state ?? device.state;
+    const newState = currentState === 'ON' ? 'OFF' : 'ON';
+  
+    // --- Bước 1: Optimistic Update ---
     setRealtimeStates(prev => ({
       ...prev,
-      [device.id]: { ...(prev[device.id] || {}), state: currentState } // Quay lại trạng thái ban đầu
+      [device.id]: { ...(prev[device.id] || {}), state: newState } // Cập nhật UI ngay
     }));
-  }
-};
+  
+    // --- Bước 2: Gửi lệnh qua WebSocket ---
+    const command: DeviceCommand = { action: "set_state", value: newState };
+    console.log(`[WS] Sending command to ${device.id}:`, command);
+    try {
+        publishToDevice(device.id, command); // <<< Gọi hàm gửi WS
+        // Không cần toast success ở đây, UI đã cập nhật, trạng thái cuối cùng sẽ được xác nhận khi nhận lại message WS
+    } catch (wsError) {
+         console.error(`[WS] Error publishing command for ${device.id}:`, wsError);
+         toast.error(`Failed to send command to device ${device.feed}. Check connection.`);
+         // --- Rollback Optimistic Update nếu gửi WS thất bại ---
+         setRealtimeStates(prev => ({
+             ...prev,
+             [device.id]: { ...(prev[device.id] || {}), state: currentState } // Quay lại trạng thái cũ
+         }));
+    }
+  
+ 
 
   const handleDeviceClick = (device: Device) => {
     // Lấy thông tin chi tiết nhất (có thể fetch lại hoặc dùng data hiện có)
@@ -329,6 +336,129 @@ const handleToggleDevice = async (device: Device) => { // Thêm async
     // Hoặc đơn giản là hiển thị data đã có:
     // setSelectedDevice({ ...device, state: realtimeStates[device.id]?.state ?? device.state });
   };
+
+
+//============== VIDEO PLAYER ==================================================================================
+
+  const videoIds = [
+    'RgKAFK5djSk', 
+    'jfKfPfyJRdk', 
+    '5qap5aO4i9A', 
+  ];
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const playerRef = useRef<YouTubePlayer | null>(null); // Ref để lưu đối tượng player
+  const [isPlaying, setIsPlaying] = useState(false); // Trạng thái đang phát hay dừng
+  const [currentTime, setCurrentTime] = useState(0); // Thời gian hiện tại (giây)
+  const [duration, setDuration] = useState(0); // Tổng thời gian video (giây)
+  const [isMuted, setIsMuted] = useState(false); // Trạng thái mute
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null); // Ref cho interval cập nhật thời gian
+
+  // Hàm lấy Player instance khi sẵn sàng
+  const onPlayerReady: YouTubeProps['onReady'] = (event) => {
+    console.log("Player Ready");
+    playerRef.current = event.target; // Lưu player instance
+    setDuration(playerRef.current?.getDuration() || 0); // Lấy tổng thời gian
+  };
+
+  // Hàm xử lý thay đổi trạng thái player (Play, Pause, End...)
+  const onPlayerStateChange: YouTubeProps['onStateChange'] = (event) => {
+    const playerStatus = event.data;
+    console.log("Player State Change:", playerStatus);
+    if (playerStatus === YouTube.PlayerState.PLAYING) {
+      setIsPlaying(true);
+      setDuration(playerRef.current?.getDuration() || 0); // Cập nhật durationเผื่อ thay đổi
+      // Bắt đầu cập nhật thời gian hiện tại
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current); // Xóa interval cũ
+      progressIntervalRef.current = setInterval(() => {
+        setCurrentTime(playerRef.current?.getCurrentTime() || 0);
+      }, 500); // Cập nhật mỗi 500ms
+    } else {
+      setIsPlaying(false);
+      // Dừng cập nhật thời gian khi Pause hoặc End
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+       // Tự động chuyển bài khi kết thúc (tùy chọn)
+      // if (playerStatus === YouTube.PlayerState.ENDED) {
+      //    handleNextVideo();
+      // }
+    }
+  };
+
+   // Hàm xử lý lỗi player
+   const onPlayerError: YouTubeProps['onError'] = (error) => {
+      console.error('YouTube Player Error:', error);
+      setIsPlaying(false);
+      if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+   }
+
+  // Chuyển video
+  const handleNextVideo = useCallback(() => {
+    const nextIndex = (currentVideoIndex + 1) % videoIds.length;
+    setCurrentVideoIndex(nextIndex);
+    // Reset trạng thái khi chuyển video
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+  }, [currentVideoIndex, videoIds.length]);
+
+  const handlePreviousVideo = useCallback(() => {
+    const prevIndex = (currentVideoIndex - 1 + videoIds.length) % videoIds.length;
+    setCurrentVideoIndex(prevIndex);
+    setIsPlaying(false);
+    setCurrentTime(0);
+    setDuration(0);
+    if (progressIntervalRef.current) clearInterval(progressIntervalRef.current);
+  }, [currentVideoIndex, videoIds.length]);
+
+  // Play/Pause
+  const togglePlay = () => {
+    if (!playerRef.current) return;
+    if (isPlaying) {
+      playerRef.current.pauseVideo();
+    } else {
+      playerRef.current.playVideo();
+    }
+  };
+
+  // Tua video
+  const handleSeek = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!playerRef.current) return;
+    const seekToTime = parseFloat(event.target.value);
+    setCurrentTime(seekToTime); // Cập nhật UI ngay
+    playerRef.current.seekTo(seekToTime, true); // Tua video
+  };
+
+  // Mute/Unmute
+  const toggleMute = () => {
+     if (!playerRef.current) return;
+     if (isMuted) {
+        playerRef.current.unMute();
+        setIsMuted(false);
+     } else {
+        playerRef.current.mute();
+        setIsMuted(true);
+     }
+  }
+
+  // Format thời gian từ giây sang MM:SS
+  const formatTime = (timeInSeconds: number): string => {
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
+  // --- Cleanup Interval khi component unmount ---
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
+//=================================================END VIDEO PLAYER===================================================
 
   // --- Render Logic ---
 
@@ -360,10 +490,67 @@ const handleToggleDevice = async (device: Device) => { // Thêm async
          <div className={styles.widgetColSpan1}> {/* Ví dụ widget chiếm 1 cột */}
              <WeatherWidget weather={weather} /> {/* Cần style WeatherWidget.module.scss */}
          </div>
-         {/* Thêm các widget khác nếu cần, ví dụ: */}
-         {/* <div className={styles.widgetColSpan2}> // Widget chiếm 2 cột
-             <YourOtherWidget />
-         </div> */}
+         <div className={`${styles.widgetColSpan2} ${styles.videoWidgetContainer}`}>
+          {/* Không cần videoHeader riêng nữa, tích hợp vào đây */}
+          <div className={styles.videoWrapper}>
+            <YouTube
+              key={videoIds[currentVideoIndex]} // Thêm key để đảm bảo player load lại đúng khi ID thay đổi
+              videoId={videoIds[currentVideoIndex]}
+              opts={{
+                height: '100%',
+                width: '100%',
+                playerVars: {
+                  autoplay: 0,
+                  controls: 0, // <<< QUAN TRỌNG: Ẩn controls mặc định
+                  modestbranding: 1,
+                  rel: 0,
+                  iv_load_policy: 3, // Ẩn annotation
+                  disablekb: 1, // Vô hiệu hóa điều khiển bằng bàn phím (tùy chọn)
+                },
+              }}
+              className={styles.youtubePlayer}
+              onReady={onPlayerReady}
+              onStateChange={onPlayerStateChange}
+              onError={onPlayerError}
+            />
+          </div>
+
+          {/* === KHU VỰC ĐIỀU KHIỂN TÙY CHỈNH === */}
+          <div className={styles.customControls}>
+             {/* Thanh tiến trình */}
+             <span className={styles.timeDisplay}>{formatTime(currentTime)}</span>
+             <input
+                type="range"
+                min="0"
+                max={duration || 0}
+                value={currentTime || 0}
+                onChange={handleSeek}
+                className={styles.progressBar}
+                disabled={!playerRef.current || duration === 0} // Disable nếu chưa sẵn sàng hoặc video không có thời lượng
+             />
+             <span className={styles.timeDisplay}>{formatTime(duration)}</span>
+
+             {/* Các nút điều khiển */}
+             <div className={styles.controlButtons}>
+                 <button onClick={handlePreviousVideo} className={styles.controlButton} aria-label="Previous Video">
+                    <SkipBack size={20} />
+                 </button>
+                 <button onClick={togglePlay} className={styles.controlButton} aria-label={isPlaying ? "Pause" : "Play"}>
+                    {isPlaying ? <Pause size={24} /> : <Play size={24} />}
+                 </button>
+                 <button onClick={handleNextVideo} className={styles.controlButton} aria-label="Next Video">
+                    <SkipForward size={20} />
+                 </button>
+                  <button onClick={toggleMute} className={styles.controlButton} aria-label={isMuted ? "Unmute" : "Mute"}>
+                     {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+                 </button>
+                 {/* Có thể thêm nút Fullscreen nếu muốn (cần thêm logic JS) */}
+             </div>
+          </div>
+          {/* === KẾT THÚC KHU VỰC ĐIỀU KHIỂN === */}
+
+        </div>
+        {/* === KẾT THÚC WIDGET VIDEO === */}
       </div>
 
       {/* Phần danh sách thiết bị */}
@@ -383,7 +570,7 @@ const handleToggleDevice = async (device: Device) => { // Thêm async
                </button>
            </div>
         )}
-
+       
         {devices.length > 0 &&
            devices.map((device) => (
               <DeviceCard

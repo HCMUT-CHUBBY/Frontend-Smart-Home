@@ -2,7 +2,7 @@
 import React from 'react';
 import { WeatherInfo } from '@/lib/types'; // Đảm bảo import WeatherInfo đã cập nhật
 // Import thêm các icon cần thiết từ Lucide
-import { Sun, Moon, Cloud, CloudSun, CloudMoon, CloudFog, CloudDrizzle, CloudRain, CloudLightning, Snowflake, Wind, Gauge, Droplet, Thermometer } from 'lucide-react';
+import { Sun, Moon, Cloud, CloudSun, CloudMoon, CloudFog, CloudDrizzle, CloudRain, CloudLightning, Snowflake, Wind, Gauge, Droplet} from 'lucide-react';
 import styles from '@/styles/Weather.module.scss'; // Import SCSS module (Sẽ tạo ở bước sau)
 
 interface WeatherWidgetProps {
