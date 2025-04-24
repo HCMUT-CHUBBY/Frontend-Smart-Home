@@ -313,7 +313,10 @@ export default function DashboardPage() {
   
  
 
-  const handleDeviceClick = (device: Device) => {
+    };
+   
+  
+    const handleDeviceClick = (device: Device) => {
     // Lấy thông tin chi tiết nhất (có thể fetch lại hoặc dùng data hiện có)
     // Ví dụ: fetch lại để đảm bảo data mới nhất
     apiClient.get<ApiResponse<Device>>(`/devices/${device.id}`)
@@ -458,6 +461,7 @@ export default function DashboardPage() {
       }
     };
   }, []);
+
 //=================================================END VIDEO PLAYER===================================================
 
   // --- Render Logic ---
@@ -478,7 +482,6 @@ export default function DashboardPage() {
         </div>
     );
   }
-
 
  
   return (
