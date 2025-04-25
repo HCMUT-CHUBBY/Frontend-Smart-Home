@@ -198,11 +198,11 @@ const handleModalSuccess = async () => {
                      }
                 });
             },
-            (error) => { // onError
-                console.error("[WS] Connection error:", error);
-                toast.error(`Real-time connection error: ${error}`);
-                // Logic retry đã có trong lib/websocket.ts
-            }
+            // (error) => { // onError//====================================================================================
+            //     console.error("[WS] Connection error:", error);
+            //    // toast.error(`Real-time connection error: ${error}`);
+            //     // Logic retry đã có trong lib/websocket.ts
+            // }
         ).catch(err => {
              console.error("[WS] Failed to initiate connection:", err);
              toast.error("Could not initiate real-time connection.");

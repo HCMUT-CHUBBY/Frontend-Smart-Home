@@ -9,8 +9,8 @@ const socketUrl = "ws://localhost:8080/ws/sensor";
 
 export const connectWebSocket = (
   token: string,
-  onConnected: () => void,
-  onError: (error: string) => void
+  onConnected: () => void
+  //onError: (error: string) => void
 ): Promise<Client> => {
   return new Promise((resolve, reject) => {
     if (stompClient && stompClient.active) {
@@ -33,14 +33,14 @@ export const connectWebSocket = (
       onStompError: (frame) => {
         // Lỗi từ STOMP broker (ví dụ: xác thực thất bại)
         console.error("Lỗi STOMP:", frame.headers['message'], frame.body);
-        onError(`Lỗi STOMP: ${frame.headers['message']}`);
+        //onError(`Lỗi STOMP: ${frame.headers['message']}`);================================================
         reject(new Error(`Lỗi STOMP: ${frame.headers['message']}`)); // Reject promise
         // Có thể không cần deactivate ở đây vì nó có thể tự thử lại
       },
       onWebSocketError: (error) => {
          // Lỗi ở tầng WebSocket (ví dụ: không kết nối được tới URL)
         console.error("Lỗi WebSocket:", error);
-        onError(`Lỗi WebSocket: ${error.message}`);
+        //onError(`Lỗi WebSocket: ${error.message}`);============================================
         reject(error); // Reject promise
       },
        onWebSocketClose: (event) => {

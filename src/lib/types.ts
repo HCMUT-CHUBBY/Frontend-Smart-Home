@@ -5,6 +5,7 @@ import { StompSubscription } from "@stomp/stompjs";
 // Dựa trên API response của bạn
 export interface Device {
   id: string;
+  isSensor: boolean;
   feed: string;
   state: "ON" | "OFF";
   type: "TEMP" | "LIGHT"; 

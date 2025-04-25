@@ -47,7 +47,7 @@ export default function SignIn() {
 
 
   return (
-    <div className="min-h-screen bg-black flex flex-col text-white overflow-hidden relative">
+    <div className="min-h-screen bg-gray-900 flex flex-col text-white overflow-hidden relative">
       {/* Animated Background Effect (giữ nguyên) */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-900/20 to-purple-900/20"></div>
