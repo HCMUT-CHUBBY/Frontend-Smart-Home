@@ -1,6 +1,5 @@
 // lib/websocket.ts (Hoặc đường dẫn tương tự)
 
-
 import { Client, StompSubscription } from "@stomp/stompjs";
 
 let stompClient: Client | null = null;
@@ -14,16 +13,18 @@ export const connectWebSocket = (
 ): Promise<Client> => {
   return new Promise((resolve, reject) => {
     if (stompClient && stompClient.active) {
-        console.warn("STOMP client đang active, sẽ deactivate trước khi kết nối lại.");
-        stompClient.deactivate();
+      console.warn(
+        "STOMP client đang active, sẽ deactivate trước khi kết nối lại."
+      );
+      stompClient.deactivate();
     }
     console.log("Đang tạo STOMP client mới...");
     stompClient = new Client({
       brokerURL: socketUrl,
       connectHeaders: { Authorization: `Bearer ${token}` }, // Gửi token để xác thực
       reconnectDelay: 5000, // Tự động kết nối lại sau 5 giây nếu mất kết nối
-      heartbeatIncoming: 4000, // Check tín hiệu từ server mỗi 4 giây
-      heartbeatOutgoing: 4000, // Gửi tín hiệu tới server mỗi 4 giây
+      heartbeatIncoming: 0, // Check tín hiệu từ server mỗi 4 giây
+      heartbeatOutgoing: 0, // Gửi tín hiệu tới server mỗi 4 giây
 
       onConnect: (frame) => {
         console.log("Kết nối WebSocket và STOMP thành công:", frame);
@@ -32,22 +33,22 @@ export const connectWebSocket = (
       },
       onStompError: (frame) => {
         // Lỗi từ STOMP broker (ví dụ: xác thực thất bại)
-        console.error("Lỗi STOMP:", frame.headers['message'], frame.body);
-        onError(`Lỗi STOMP: ${frame.headers['message']}`);
-        reject(new Error(`Lỗi STOMP: ${frame.headers['message']}`)); // Reject promise
+        console.error("Lỗi STOMP:", frame.headers["message"], frame.body);
+        onError(`Lỗi STOMP: ${frame.headers["message"]}`);
+        reject(new Error(`Lỗi STOMP: ${frame.headers["message"]}`)); // Reject promise
         // Có thể không cần deactivate ở đây vì nó có thể tự thử lại
       },
       onWebSocketError: (error) => {
-         // Lỗi ở tầng WebSocket (ví dụ: không kết nối được tới URL)
+        // Lỗi ở tầng WebSocket (ví dụ: không kết nối được tới URL)
         console.error("Lỗi WebSocket:", error);
         onError(`Lỗi WebSocket: ${error.message}`);
         reject(error); // Reject promise
       },
-       onWebSocketClose: (event) => {
-            console.log("WebSocket đã đóng:", event);
-            // onError("WebSocket đã bị đóng. Đang thử kết nối lại..."); // Thông báo cho người dùng (tùy chọn)
-            // reconnectDelay sẽ tự động xử lý việc kết nối lại
-       }
+      onWebSocketClose: (event) => {
+        console.log("WebSocket đã đóng:", event);
+        // onError("WebSocket đã bị đóng. Đang thử kết nối lại..."); // Thông báo cho người dùng (tùy chọn)
+        // reconnectDelay sẽ tự động xử lý việc kết nối lại
+      },
     });
 
     console.log("Kích hoạt STOMP client...");
@@ -64,8 +65,10 @@ export const connectWebSocket = (
 export const subscribeToDevice = (
   deviceId: string,
   onMessageReceived: (message: string) => void
-): StompSubscription | null => { // <-- Trả về StompSubscription | null
-  if (stompClient && stompClient.connected) { // Kiểm tra connected thay vì active
+): StompSubscription | null => {
+  // <-- Trả về StompSubscription | null
+  if (stompClient && stompClient.connected) {
+    // Kiểm tra connected thay vì active
     try {
       console.log(`Đang subscribe topic /topic/devices/${deviceId}`);
       // Hàm subscribe trả về đối tượng StompSubscription
@@ -78,7 +81,9 @@ export const subscribeToDevice = (
         { id: `sub-${deviceId}` } // Gán ID cho subscription (hữu ích cho debug)
       );
 
-      console.log(`Đã subscribe thành công ${deviceId} (Sub ID: ${subscription.id}). Kích hoạt lấy data ban đầu...`);
+      console.log(
+        `Đã subscribe thành công ${deviceId} (Sub ID: ${subscription.id}). Kích hoạt lấy data ban đầu...`
+      );
 
       // Gửi message tới /app/{deviceId}/subscribe để kích hoạt backend
       // gửi lại data ban đầu thông qua @SendTo("/topic/devices/{id}")
@@ -88,13 +93,14 @@ export const subscribeToDevice = (
       });
 
       return subscription; // Trả về đối tượng subscription thành công
-
     } catch (e) {
       console.error(`Lỗi khi subscribe vào device ${deviceId}:`, e);
       return null; // Trả về null nếu có lỗi trong quá trình subscribe
     }
   } else {
-    console.error(`STOMP client chưa kết nối khi cố gắng subscribe vào ${deviceId}.`);
+    console.error(
+      `STOMP client chưa kết nối khi cố gắng subscribe vào ${deviceId}.`
+    );
     return null; // Trả về null nếu client không kết nối
   }
 };
@@ -108,25 +114,29 @@ export const publishToDevice = (
   deviceId: string,
   command: { action: string; value: string }
 ) => {
-  if (stompClient && stompClient.connected) { // Kiểm tra connected
+  if (stompClient && stompClient.connected) {
+    // Kiểm tra connected
     try {
-        const destination = `/app/${deviceId}/publish`;
-        const body = JSON.stringify(command);
-        console.log(`>>> Gửi lệnh tới ${destination}:`, command);
+      const destination = `/app/${deviceId}/publish`;
+      const body = JSON.stringify(command);
+      console.log(`>>> Gửi lệnh tới ${destination}:`, command);
 
-        stompClient.publish({
-            destination: destination,
-            body: body,
-        });
-        // Lưu ý: Publish là gửi đi, không có xác nhận trực tiếp ở đây.
-        // Việc xử lý thành công/thất bại của lệnh cần được phản hồi từ backend
-        // (ví dụ: qua message trên topic hoặc cách khác).
+      stompClient.publish({
+        destination: destination,
+        body: body,
+      });
+      // Lưu ý: Publish là gửi đi, không có xác nhận trực tiếp ở đây.
+      // Việc xử lý thành công/thất bại của lệnh cần được phản hồi từ backend
+      // (ví dụ: qua message trên topic hoặc cách khác).
     } catch (e) {
       console.error(`!!! Lỗi khi publish lệnh cho ${deviceId}:`, e);
       alert(`Có lỗi xảy ra khi gửi lệnh đến thiết bị ${deviceId}.`);
     }
   } else {
-    console.error(`>>> Không thể publish: Client chưa kết nối. StompClient:`, stompClient);
+    console.error(
+      `>>> Không thể publish: Client chưa kết nối. StompClient:`,
+      stompClient
+    );
     alert("Không thể gửi lệnh do mất kết nối đến server.");
   }
 };
@@ -135,7 +145,9 @@ export const publishToDevice = (
  * Hủy đăng ký lắng nghe tin nhắn từ một topic đã subscribe trước đó.
  * @param subscription - Đối tượng StompSubscription cần hủy.
  */
-export const unsubscribeFromDevice = (subscription: StompSubscription | null) => {
+export const unsubscribeFromDevice = (
+  subscription: StompSubscription | null
+) => {
   if (subscription) {
     try {
       const subId = subscription.id;
@@ -149,19 +161,21 @@ export const unsubscribeFromDevice = (subscription: StompSubscription | null) =>
   }
 };
 
-
 /**
  * Ngắt kết nối STOMP và đóng WebSocket.
  * Cần đảm bảo đã gọi unsubscribeFromDevice cho tất cả các subscription trước khi gọi hàm này.
  */
 export const disconnectWebSocket = () => {
-  if (stompClient && stompClient.active) { // Kiểm tra active trước khi deactivate
+  if (stompClient && stompClient.active) {
+    // Kiểm tra active trước khi deactivate
     console.log("Đang ngắt kết nối STOMP client...");
     stompClient.deactivate(); // Thực hiện ngắt kết nối an toàn
     console.log("STOMP client đã được deactivate.");
     stompClient = null; // Gán lại là null để biết đã ngắt kết nối
   } else {
-      console.log("STOMP client không active hoặc không tồn tại, không cần ngắt kết nối.");
+    console.log(
+      "STOMP client không active hoặc không tồn tại, không cần ngắt kết nối."
+    );
   }
 };
 
@@ -170,5 +184,5 @@ export const disconnectWebSocket = () => {
  * @returns Đối tượng Client STOMP hiện tại hoặc null.
  */
 export const getStompClient = (): Client | null => {
-    return stompClient;
-}
+  return stompClient;
+};
