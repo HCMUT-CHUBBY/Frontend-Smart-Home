@@ -32,9 +32,8 @@ const Sidebar = () => {
             <Link
               key={item.href}
               href={item.href}
-              className={`${styles.navItem} ${
-                pathname === item.href ? styles.active : ""
-              }`}
+              className={`${styles.navItem} ${pathname === item.href ? styles.active : ""
+                }`}
             >
               <ItemIcon className={styles.icon} />
               <span>{item.label}</span>
@@ -56,7 +55,7 @@ const Sidebar = () => {
               </div>
               <div className={styles.userDetails}>
                 <p className={styles.userName}>
-                  {session?.user?.name || session?.user?.email || "Guest"}
+                  {session?.user?.name || session?.user?.email || sessionStorage.getItem("username") || "Guest"}
                 </p>
               </div>
             </div>
