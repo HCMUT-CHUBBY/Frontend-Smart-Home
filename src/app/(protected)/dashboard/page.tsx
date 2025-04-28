@@ -55,6 +55,8 @@ export default function DashboardPage() {
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [realtimeStates, setRealtimeStates] = useState<DeviceRealtimeState>({});
 
+  const clickLockRef = useRef<{ [deviceId: string]: boolean }>({});
+
   const subscriptionsRef = useRef<DeviceSubscriptions>({});
   const isWebSocketConnectingRef = useRef(false);
   const firstConnectRef = useRef(false); // Để theo dõi lần kết nối đầu tiên
@@ -336,6 +338,17 @@ export default function DashboardPage() {
       toast.warn("Authentication required.");
       return;
     }
+
+    // Check lock
+    if (clickLockRef.current[device.id]) {
+      console.warn(`[WS] Click too fast for device ${device.id}, ignored.`);
+      return;
+    }
+
+    clickLockRef.current[device.id] = true; // Lock ngay
+    setTimeout(() => {
+      clickLockRef.current[device.id] = false; // Unlock sau 500ms
+    }, 500);
 
     const currentState = realtimeStates[device.id]?.state ?? device.state;
     const newState = currentState === "ON" ? "OFF" : "ON";

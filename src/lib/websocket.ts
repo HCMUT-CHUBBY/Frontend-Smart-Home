@@ -87,10 +87,10 @@ export const subscribeToDevice = (
 
       // Gửi message tới /app/{deviceId}/subscribe để kích hoạt backend
       // gửi lại data ban đầu thông qua @SendTo("/topic/devices/{id}")
-      stompClient.publish({
-        destination: `/app/${deviceId}/subscribe`,
-        body: "", // Không cần body cho việc trigger này
-      });
+      // stompClient.publish({
+      //   destination: `/app/${deviceId}/subscribe`,
+      //   body: "", // Không cần body cho việc trigger này
+      // });
 
       return subscription; // Trả về đối tượng subscription thành công
     } catch (e) {
