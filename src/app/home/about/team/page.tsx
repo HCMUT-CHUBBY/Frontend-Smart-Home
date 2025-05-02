@@ -53,7 +53,7 @@ const TeamPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white pt-24">
+    <div className="min-h-screen bg-gray-700 text-white pt-24">
       {/* Header with navigation */}
       <header className="fixed w-full top-0 z-50 bg-black/80 backdrop-blur-md py-4">
         <div className="container mx-auto px-4 flex justify-between items-center">

@@ -4,21 +4,21 @@ import axios, { AxiosResponse } from "axios";
 import { JWT } from "next-auth/jwt";
 import { CustomSession } from "./types";
 interface Credentials {
-  username:string;
+  username: string;
   password: string;
 }
-interface LoginResponse{
+interface LoginResponse {
   userId: string;
   accessToken: string;
 }
-interface CustomUser extends User{
-  id:string;
+interface CustomUser extends User {
+  id: string;
   accessToken: string;
 }
 
-interface CustomToken extends JWT{
-  id?:string;
-  accessToken?:string;
+interface CustomToken extends JWT {
+  id?: string;
+  accessToken?: string;
 }
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -29,12 +29,12 @@ export const authOptions: NextAuthOptions = {
         username: { label: "Username", type: "text" },
         password: { label: "Password", type: "password" },
       },
-      async authorize(credentials: Credentials| undefined ): Promise<CustomUser | null> {
+      async authorize(credentials: Credentials | undefined): Promise<CustomUser | null> {
         if (!credentials || !credentials.username || !credentials.password) {
           return null;
         }
         try {
-          const response:AxiosResponse<LoginResponse> = await axios.post("http://localhost:8080/api/v1/auth/login", {
+          const response: AxiosResponse<LoginResponse> = await axios.post("http://localhost:8080/api/v1/auth/login", {
             username: credentials.username,
             password: credentials.password,
           });
@@ -59,9 +59,9 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   callbacks: {
-    async jwt({ token, user }) : Promise<JWT> {
+    async jwt({ token, user }): Promise<JWT> {
       if (user) {
-        token.id = (user as CustomUser).id! ;
+        token.id = (user as CustomUser).id!;
         token.accessToken = (user as CustomUser).accessToken!;
       }
       return token;
@@ -71,7 +71,7 @@ export const authOptions: NextAuthOptions = {
         (session.user as CustomUser).id = (token as CustomToken).id as string;
         (session.user as CustomUser).accessToken = (token as CustomToken).accessToken as string;
       }
-      return session as CustomSession;    
+      return session as CustomSession;
     },
   },
 };

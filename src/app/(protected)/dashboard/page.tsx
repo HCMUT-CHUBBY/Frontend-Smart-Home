@@ -14,10 +14,10 @@ import {
   VolumeX,
 } from "lucide-react";
 
+import AddEditDeviceModal from "@/components/management/AddEditDeviceModal"; // Hoặc đường dẫn đúng tới file bạn đã sửa
 import apiClient, { fetchWeather } from "@/lib/apiClient";
 import {
   Device,
-  DeviceDTO,
   ApiResponse,
   CustomSession,
   WeatherInfo,
@@ -35,7 +35,7 @@ import {
 
 import DeviceCard from "@/components/dashboard/DeviceCard";
 import WeatherWidget from "@/components/dashboard/WeatherWidget";
-import AddDeviceModal from "@/components/dashboard/AddDeviceModal";
+
 import DeviceDetailsModal from "@/components/dashboard/DeviceDetailModal";
 import { toast, ToastContainer } from "react-toastify"; // Ví dụ dùng react-toastify
 import "react-toastify/dist/ReactToastify.css";
@@ -113,6 +113,16 @@ export default function DashboardPage() {
       console.error("Error fetching weather:", error);
     }
   }, []);
+
+  // Thêm hàm này vào trong component DashboardPage
+  const handleModalSuccess = async () => {
+    console.log("Add/Edit Modal reported success!");
+    setShowAddDeviceModal(false); // Đóng modal thêm mới
+    // Nếu bạn dùng chung state cho modal edit thì có thể cần handler đóng chung
+    // handleCloseModal();
+    await loadDevices(); // Tải lại danh sách devices
+    // toast.success("Device saved successfully!"); // Có thể thêm toast nếu muốn
+  };
 
   const handleWebSocketMessage = useCallback(
     (deviceId: string, messageBody: string) => {
@@ -275,63 +285,6 @@ export default function DashboardPage() {
   }, []); // Cleanup khi component unmount
   // --- Event Handlers ---
 
-  const handleAddDevice = async (newDeviceData: DeviceDTO) => {
-    if (!session) {
-      toast.warn("Authentication required.");
-      return;
-    }
-    // Giả sử isSensor và deviceConfig được xử lý ở backend hoặc không cần thiết khi POST
-    const dataToSend: DeviceDTO = { ...newDeviceData };
-    console.log("Adding device:", dataToSend);
-
-    try {
-      const response = await apiClient.post<ApiResponse<unknown>>(
-        "/devices",
-        dataToSend
-      );
-      toast.success(response.data?.message || "Device added successfully!");
-      setShowAddDeviceModal(false); // <<< Đóng modal KHI THÀNH CÔNG
-      await loadDevices();
-    } catch (error: unknown) {
-      console.error("Error adding device:", error);
-      let userErrorMessage = "Failed to add device: Unknown error occurred."; // Lỗi mặc định
-
-      // --- KIỂM TRA LỖI FEED NOT FOUND ---
-      if (axios.isAxiosError(error) && error.response) {
-        const responseData = error.response.data;
-        // Chuỗi message này cần khớp với message thực tế backend trả về
-        const responseMessage =
-          responseData?.message || JSON.stringify(responseData);
-        const feedName = dataToSend.feed || "provided"; // Lấy tên feed đã nhập
-
-        if (
-          error.response.status === 400 &&
-          responseMessage?.toLowerCase().includes("feed not found")
-        ) {
-          // <<< Điều chỉnh chuỗi kiểm tra nếu cần
-          userErrorMessage = `Lỗi: Feed '${feedName}' không tồn tại trên Adafruit IO. Vui lòng tạo Feed thủ công trên io.adafruit.com trước khi thêm.`;
-        } else if (
-          error.response.status === 400 &&
-          responseMessage?.toLowerCase().includes("already exists")
-        ) {
-          // Ví dụ lỗi khác
-          userErrorMessage = `Lỗi: Thiết bị với Feed '${feedName}' (hoặc ID tương tự) đã tồn tại.`;
-        } else {
-          userErrorMessage = `Failed to add device: ${responseMessage}`;
-        }
-      } else if (error instanceof Error) {
-        userErrorMessage = `Failed to add device: ${error.message}`;
-      }
-      // --- KẾT THÚC KIỂM TRA LỖI ---
-
-      toast.error(userErrorMessage);
-      // *** Quan trọng: KHÔNG đóng modal khi lỗi ***
-      // setShowAddDeviceModal(false);
-    }
-    // Không cần setIsLoading ở đây nếu modal tự quản lý loading state
-  };
-  // Bên trong component DashboardPage
-
   const handleToggleDevice = (device: Device) => {
     // Bỏ async nếu chỉ dùng WS
     if (!session) {
@@ -360,6 +313,8 @@ export default function DashboardPage() {
     }));
 
     // --- Bước 2: Gửi lệnh qua WebSocket ---
+    // Gửi action là "TOGGLE" thay vì "set_state"
+    // Vẫn giữ lại value vì backend có thể cần nó (hoặc bỏ qua nếu không cần)
     const command: DeviceCommand = { action: "TOGGLE", value: newState };
     console.log(`[WS] Sending command to ${device.id}:`, command);
     try {
@@ -684,13 +639,13 @@ export default function DashboardPage() {
           ))}
       </div>
       {/* Modals (Giữ nguyên) */}
-      <AddDeviceModal
+      <AddEditDeviceModal
         isOpen={showAddDeviceModal}
         onClose={() => setShowAddDeviceModal(false)}
-        onSubmit={handleAddDevice}
+        onSuccess={handleModalSuccess}
+        initialData={null}
         defaultAdaUsername={process.env.NEXT_PUBLIC_ADA_USERNAME || ""}
         defaultAdaApiKey={process.env.NEXT_PUBLIC_ADA_API_KEY || ""}
-        // Component AddDeviceModal cần style riêng (ví dụ modal.module.scss)
       />
       <DeviceDetailsModal
         isOpen={!!selectedDevice}

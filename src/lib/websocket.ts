@@ -41,7 +41,7 @@ export const connectWebSocket = (
       onWebSocketError: (error) => {
         // Lỗi ở tầng WebSocket (ví dụ: không kết nối được tới URL)
         console.error("Lỗi WebSocket:", error);
-        onError(`Lỗi WebSocket: ${error.message}`);
+        //onError(`Lỗi WebSocket: ${error.message}`);============================================
         reject(error); // Reject promise
       },
       onWebSocketClose: (event) => {
@@ -165,20 +165,43 @@ export const unsubscribeFromDevice = (
  * Ngắt kết nối STOMP và đóng WebSocket.
  * Cần đảm bảo đã gọi unsubscribeFromDevice cho tất cả các subscription trước khi gọi hàm này.
  */
+// lib/websocket.ts
 export const disconnectWebSocket = () => {
-  if (stompClient && stompClient.active) {
-    // Kiểm tra active trước khi deactivate
-    console.log("Đang ngắt kết nối STOMP client...");
-    stompClient.deactivate(); // Thực hiện ngắt kết nối an toàn
-    console.log("STOMP client đã được deactivate.");
-    stompClient = null; // Gán lại là null để biết đã ngắt kết nối
+  // Thêm kiểm tra .connected
+  if (stompClient && stompClient.connected && stompClient.active) {
+    console.log("STOMP client is connected and active. Deactivating...");
+    try {
+      stompClient.deactivate(); // Gọi deactivate
+      console.log("STOMP client deactivate called.");
+    } catch (e) {
+      console.error("Error during stompClient.deactivate():", e);
+    } finally {
+      stompClient = null; // Vẫn set về null
+    }
+  } else if (stompClient && stompClient.active) {
+    // Trường hợp active nhưng không connected? Vẫn thử deactivate
+    console.warn(
+      "STOMP client is active but not connected. Attempting deactivate anyway..."
+    );
+    try {
+      stompClient.deactivate();
+      console.log(
+        "STOMP client deactivate called (was active but not connected)."
+      );
+    } catch (e) {
+      console.error(
+        "Error during stompClient.deactivate() (active but not connected):",
+        e
+      );
+    } finally {
+      stompClient = null;
+    }
   } else {
     console.log(
-      "STOMP client không active hoặc không tồn tại, không cần ngắt kết nối."
+      "STOMP client not active or already null. No need to disconnect."
     );
   }
 };
-
 /**
  * (Tùy chọn) Lấy instance của stompClient nếu cần truy cập trực tiếp (hạn chế sử dụng).
  * @returns Đối tượng Client STOMP hiện tại hoặc null.

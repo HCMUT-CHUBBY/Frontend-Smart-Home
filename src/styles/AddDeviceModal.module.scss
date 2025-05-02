@@ -70,6 +70,7 @@
     background-color: lighten($dark-bg-card, 5%);
     border-color: $dark-border-color;
     color: $dark-text-primary;
+
     &::placeholder {
       color: $dark-text-secondary;
     }
@@ -145,6 +146,7 @@
     background-color: lighten($dark-bg-card, 10%);
     color: $dark-text-secondary;
     border-color: $dark-border-color;
+
     &:hover:not(:disabled) {
       background-color: lighten($dark-bg-card, 15%);
     }

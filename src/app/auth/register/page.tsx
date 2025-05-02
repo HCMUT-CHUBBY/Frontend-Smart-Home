@@ -1,11 +1,11 @@
 "use client";
-
+import ForwardIcon from '@/assests/forward.svg';
 import { useState, FormEvent } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import LogoLight from '@/assests/illumination.svg'; // Assuming this path is correct
+import LogoLight from '@/assests/illumination.svg';
 
 export default function SignUp() {
   const [username, setUsername] = useState("");
@@ -45,14 +45,14 @@ export default function SignUp() {
       if (response.data === "User registered successfully") {
         router.push("/auth/login");
       } else {
-         // Handle other potential success messages or scenarios if needed
-         console.log("Registration response:", response.data);
-         // Optionally, show a success message before redirecting
-         // toast.success("Registration successful! Redirecting to login...");
-         router.push("/auth/login");
+        // Handle other potential success messages or scenarios if needed
+        console.log("Registration response:", response.data);
+        // Optionally, show a success message before redirecting
+        // toast.success("Registration successful! Redirecting to login...");
+        router.push("/auth/login");
       }
     } catch (error: unknown) {
-       // Translated error messages
+      // Translated error messages
       if (axios.isAxiosError(error) && error.response) {
         setError(`Sign up failed. ${error.response.data?.message || error.response.data}`); // Try to get message field first
       } else if (error instanceof Error) {
@@ -67,7 +67,7 @@ export default function SignUp() {
 
   return (
     // Main container with dark background and relative positioning
-    <div className="min-h-screen bg-black flex flex-col text-white overflow-hidden relative">
+    <div className="min-h-screen bg-gray-700 flex flex-col text-white overflow-hidden relative">
       {/* Animated background elements */}
       <div className="absolute inset-0 z-0">
         <div className="absolute top-0 left-0 right-0 bottom-0 bg-gradient-to-br from-blue-900/20 to-purple-900/20"></div>
@@ -100,8 +100,20 @@ export default function SignUp() {
           {/* Navigation */}
           <nav className="hidden md:flex items-center gap-8">
             {/* Translated Links */}
-            <Link href="/" className="hover:text-blue-400 transition-colors">
-              Home
+            <Link
+              href="/"
+              // Thêm: flex items-center gap-1 (hoặc gap-2) để căn chỉnh icon và chữ
+              className="hover:text-blue-400 transition-colors flex items-center gap-1.5"
+            >
+              {/* Thêm SVG component ở đây */}
+              <Image
+                src={ForwardIcon.src}
+                alt="Synapse Logo"
+                width={40}
+                height={40}
+                className="object-contain"
+              />
+              <span>Home</span> {/* Bọc chữ trong span nếu muốn kiểm soát riêng */}
             </Link>
             <Link href="/auth/login" className="hover:text-blue-400 transition-colors">
               Login
@@ -119,11 +131,11 @@ export default function SignUp() {
             <div className="text-center mb-8">
               {/* Translated Title */}
               <h1 className="text-3xl font-bold mb-2 bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                Create Your Account
+                Tạo tài khoản của bạn
               </h1>
               {/* Translated Subtitle */}
-              <p className="text-gray-300">
-                Create an account to start experiencing your smart home.
+              <p className="text-white">
+                Tạo tài khoản của bạn để bắt đầu hành trình thông minh hơn.
               </p>
             </div>
 
@@ -132,9 +144,9 @@ export default function SignUp() {
               {/* First Name and Last Name grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                   {/* Translated Label */}
-                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-300 mb-1">
-                    First Name
+                  {/* Translated Label */}
+                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-50 mb-1">
+                    Họ
                   </label>
                   <input
                     id="firstName"
@@ -150,16 +162,16 @@ export default function SignUp() {
                 </div>
 
                 <div>
-                   {/* Translated Label */}
-                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-300 mb-1">
-                    Last Name
+                  {/* Translated Label */}
+                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-50 mb-1">
+                    Tên
                   </label>
                   <input
                     id="lastName"
                     type="text"
                     value={lastName}
                     onChange={(e) => setLastName(e.target.value)}
-                     // Translated Placeholder
+                    // Translated Placeholder
                     placeholder="Enter your last name"
                     className="w-full px-4 py-3 rounded-lg bg-gray-900/50 border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     required
@@ -170,9 +182,9 @@ export default function SignUp() {
 
               {/* Username (might be email) */}
               <div>
-                 {/* Translated Label */}
-                <label htmlFor="username" className="block text-sm font-medium text-gray-300 mb-1">
-                  Username
+                {/* Translated Label */}
+                <label htmlFor="username" className="block text-sm font-medium text-gray-50 mb-1">
+                  Tên đăng nhập
                 </label>
                 <input
                   id="username"
@@ -191,8 +203,8 @@ export default function SignUp() {
               {/* Phone number */}
               <div>
                 {/* Translated Label */}
-                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-300 mb-1">
-                  Phone Number
+                <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-50 mb-1">
+                  Số điện thoại
                 </label>
                 <input
                   id="phoneNumber"
@@ -211,8 +223,8 @@ export default function SignUp() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   {/* Translated Label */}
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-1">
-                    Password
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-50 mb-1">
+                    Mật khẩu
                   </label>
                   <input
                     id="password"
@@ -229,15 +241,15 @@ export default function SignUp() {
 
                 <div>
                   {/* Translated Label */}
-                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-1">
-                    Confirm Password
+                  <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-50 mb-1">
+                    Xác nhận mật khẩu
                   </label>
                   <input
                     id="confirmPassword"
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                     // Translated Placeholder
+                    // Translated Placeholder
                     placeholder="Re-enter your password"
                     className="w-full px-4 py-3 rounded-lg bg-gray-900/50 border border-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                     required
@@ -259,8 +271,8 @@ export default function SignUp() {
                 </div>
                 <div className="ml-3 text-sm">
                   {/* Translated Label and Links */}
-                  <label htmlFor="terms" className="text-gray-300">
-                    I agree to the <a href="#" className="text-blue-400 hover:text-blue-300 underline">Terms of Service</a> and <a href="#" className="text-blue-400 hover:text-blue-300 underline">Privacy Policy</a>
+                  <label htmlFor="terms" className="text-gray-50">
+                    Tôi đồng ý với <a href="#" className="text-blue-400 hover:text-blue-300 underline">Các điều khoản dịch vụ</a> và <a href="#" className="text-blue-400 hover:text-blue-300 underline">Chính sách bảo mật</a>
                   </label>
                 </div>
               </div>
@@ -285,28 +297,28 @@ export default function SignUp() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Processing...
+                    Đang xử lý...
                   </span>
                 ) : (
-                   // Translated Button Text
-                  'Sign Up'
+                  // Translated Button Text
+                  'Đăng ký'
                 )}
               </button>
             </form>
 
             {/* Link to Login page */}
-            <p className="mt-6 text-center text-gray-300">
-               {/* Translated Text and Link */}
-              Already have an account?{' '}
+            <p className="mt-6 text-center text-gray-50">
+              {/* Translated Text and Link */}
+              Đã có tài khoản?{' '}
               <Link href="/auth/login" className="text-blue-400 hover:text-blue-300 transition-colors font-medium underline">
-                Login
+                Đăng nhập
               </Link>
             </p>
           </div>
 
           {/* Features section below the form */}
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-             {/* Translated Feature Blocks */}
+            {/* Translated Feature Blocks */}
             <div className="p-4 bg-blue-900/20 backdrop-blur-sm rounded-lg">
               <div className="inline-flex items-center justify-center rounded-full bg-blue-500/20 p-3 mb-3">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -314,7 +326,7 @@ export default function SignUp() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-white">Safe & Secure</h3>
-              <p className="mt-1 text-sm text-gray-300">Protect your home with our smart security system.</p>
+              <p className="mt-1 text-sm text-gray-50">Protect your home with our smart security system.</p>
             </div>
 
             <div className="p-4 bg-purple-900/20 backdrop-blur-sm rounded-lg">
@@ -324,7 +336,7 @@ export default function SignUp() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-white">Energy Saving</h3>
-              <p className="mt-1 text-sm text-gray-300">Optimize your home&#39;s energy consumption.</p>
+              <p className="mt-1 text-sm text-gray-50">Optimize your home&#39;s energy consumption.</p>
             </div>
 
             <div className="p-4 bg-pink-900/20 backdrop-blur-sm rounded-lg">
@@ -334,7 +346,7 @@ export default function SignUp() {
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-white">Remote Control</h3>
-              <p className="mt-1 text-sm text-gray-300">Manage your home from anywhere in the world.</p>
+              <p className="mt-1 text-sm text-gray-50">Manage your home from anywhere in the world.</p>
             </div>
           </div>
         </div>
@@ -343,7 +355,7 @@ export default function SignUp() {
       {/* Footer */}
       <footer className="py-6 bg-black/80 backdrop-blur-md z-10">
         <div className="container mx-auto px-4 text-center text-gray-400 text-sm">
-           {/* Translated Footer */}
+          {/* Translated Footer */}
           <p>© {new Date().getFullYear()} Synapse Home. All rights reserved.</p>
         </div>
       </footer>
