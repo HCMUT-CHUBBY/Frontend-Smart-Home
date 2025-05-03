@@ -14,10 +14,13 @@ import {
   VolumeX,
 } from "lucide-react";
 
-import AddEditDeviceModal from "@/components/management/AddEditDeviceModal"; // Hoặc đường dẫn đúng tới file bạn đã sửa
+ // Hoặc đường dẫn đúng tới file bạn đã sửa
 import apiClient, { fetchWeather } from "@/lib/apiClient";
 import {
-  Device,
+  // <<< SỬA: Import cả DeviceFromAPI và Device >>>
+  DeviceFromAPI,
+  Device, // Đây là kiểu dữ liệu ĐÃ ĐƯỢC XỬ LÝ (có type, isSensor)
+  DeviceDTO,
   ApiResponse,
   CustomSession,
   WeatherInfo,
@@ -32,11 +35,11 @@ import {
   unsubscribeFromDevice,
   disconnectWebSocket,
 } from "@/lib/websocket";
-
+import { processDeviceList, processDeviceData } from "@/lib/deviceUtils";
 import DeviceCard from "@/components/dashboard/DeviceCard";
 import WeatherWidget from "@/components/dashboard/WeatherWidget";
-
-import DeviceDetailsModal from "@/components/dashboard/DeviceDetailModal";
+import AddEditDeviceModal from "@/components/management/AddEditDeviceModal"; // Giả sử file này ở dashboard
+import ConfirmationModal from "@/components/ui/ConformModal";
 import { toast, ToastContainer } from "react-toastify"; // Ví dụ dùng react-toastify
 import "react-toastify/dist/ReactToastify.css";
 import styles from "@/styles/DashBoard.module.scss"; // CSS module cho dashboard
@@ -48,53 +51,75 @@ export default function DashboardPage() {
     status: "loading" | "authenticated" | "unauthenticated";
   };
 
+   // --- State ---
+  // <<< State devices giờ sẽ lưu kiểu Device (đã xử lý) >>>
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showAddDeviceModal, setShowAddDeviceModal] = useState(false);
+  // <<< State selectedDevice giờ sẽ lưu kiểu Device (đã xử lý) >>>
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [realtimeStates, setRealtimeStates] = useState<DeviceRealtimeState>({});
+  const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [modalMode, setModalMode] = useState<'add' | 'edit' | null>(null);
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
+  const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
 
-  const clickLockRef = useRef<{ [deviceId: string]: boolean }>({});
+   // --- Refs (giữ nguyên) ---
+   const clickLockRef = useRef<{ [deviceId: string]: boolean }>({});
+   const subscriptionsRef = useRef<DeviceSubscriptions>({});
+   const isWebSocketConnectingRef = useRef(false);
+   const firstConnectRef = useRef(false);
+   const realtimeStatesRef = useRef(realtimeStates); // Ref cho realtimeStates
+   useEffect(() => {
+    realtimeStatesRef.current = realtimeStates;
+  }, [realtimeStates]);
 
-  const subscriptionsRef = useRef<DeviceSubscriptions>({});
-  const isWebSocketConnectingRef = useRef(false);
-  const firstConnectRef = useRef(false); // Để theo dõi lần kết nối đầu tiên
 
   const loadDevices = useCallback(async () => {
     if (status !== "authenticated") return;
     setIsLoading(true);
+    console.log("Fetching devices...");
     try {
-      const response = await apiClient.get<ApiResponse<Device[]>>("/devices");
+      // <<< SỬA: API trả về DeviceFromAPI[] >>>
+      const response = await apiClient.get<ApiResponse<DeviceFromAPI[]>>("/devices");
+      console.log("API Response (/devices):", response.data);
       if (response.data && response.data.data) {
-        setDevices(response.data.data);
-        if (response.data.data.length === 0) {
-          setShowAddDeviceModal(true);
-        } else {
-          const initialStates: DeviceRealtimeState = {};
-          response.data.data.forEach((dev) => {
-            initialStates[dev.id] = { state: dev.state };
-          });
-          setRealtimeStates(initialStates);
-        }
+        // <<< THÊM: Xử lý dữ liệu trả về để thêm type và isSensor >>>
+        const processedDevices = processDeviceList(response.data.data);
+        console.log("Processed devices data:", processedDevices); // Log dữ liệu đã xử lý
+
+        setDevices(processedDevices); // <<< Lưu dữ liệu ĐÃ XỬ LÝ vào state
+
+        // Cập nhật realtimeStates ban đầu
+        const initialStates: DeviceRealtimeState = {};
+         // Sử dụng realtimeStatesRef để lấy giá trị mới nhất mà không gây loop
+        const currentRealtimeStates = realtimeStatesRef.current;
+        processedDevices.forEach((dev) => { // Dùng mảng đã xử lý
+          initialStates[dev.id] = { state: currentRealtimeStates[dev.id]?.state ?? dev.state };
+        });
+        setRealtimeStates(initialStates);
       } else {
         setDevices([]);
+        setRealtimeStates({});
       }
     } catch (error: unknown) {
-      console.error("Error fetching devices:", error);
-      if (error instanceof Error) {
-        const errorMessage =
-          (error as { response?: { data?: { message?: string } } })?.response
-            ?.data?.message || error.message;
-        toast.error(`Failed to load devices: ${errorMessage}`);
-      } else {
-        toast.error("Failed to load devices: Unknown error occurred.");
-      }
-      setDevices([]); // Đặt là mảng rỗng khi có lỗi
+        console.error("Error fetching devices:", error);
+        // ... (Xử lý lỗi toast như cũ) ...
+         if (axios.isAxiosError(error)) {
+             const errorMessage = error.response?.data?.message || error.message;
+             toast.error(`Failed to load devices: ${errorMessage}`);
+         } else if (error instanceof Error) {
+             toast.error(`Failed to load devices: ${error.message}`);
+         } else {
+             toast.error("Failed to load devices: Unknown error occurred.");
+         }
+        setDevices([]); // Đặt là mảng rỗng khi có lỗi
+        setRealtimeStates({});
     } finally {
       setIsLoading(false);
     }
-  }, [status]); // Chỉ phụ thuộc vào status
+  // <<< Bỏ realtimeStates khỏi dependency list >>>
+  }, [status]); // Chỉ nên phụ thuộc status
 
   const loadWeather = useCallback(async () => {
     const city = process.env.NEXT_PUBLIC_WEATHER_CITY || "Ho Chi Minh City";
@@ -115,14 +140,14 @@ export default function DashboardPage() {
   }, []);
 
   // Thêm hàm này vào trong component DashboardPage
-  const handleModalSuccess = async () => {
-    console.log("Add/Edit Modal reported success!");
-    setShowAddDeviceModal(false); // Đóng modal thêm mới
-    // Nếu bạn dùng chung state cho modal edit thì có thể cần handler đóng chung
-    // handleCloseModal();
-    await loadDevices(); // Tải lại danh sách devices
-    // toast.success("Device saved successfully!"); // Có thể thêm toast nếu muốn
-  };
+  // const handleModalSuccess = async () => {
+  //   console.log("Add/Edit Modal reported success!");
+  //   setShowAddDeviceModal(false); // Đóng modal thêm mới
+  //   // Nếu bạn dùng chung state cho modal edit thì có thể cần handler đóng chung
+  //   // handleCloseModal();
+  //   await loadDevices(); // Tải lại danh sách devices
+  //   // toast.success("Device saved successfully!"); // Có thể thêm toast nếu muốn
+  // };
 
   const handleWebSocketMessage = useCallback(
     (deviceId: string, messageBody: string) => {
@@ -284,6 +309,180 @@ export default function DashboardPage() {
     };
   }, []); // Cleanup khi component unmount
   // --- Event Handlers ---
+  const openEditModal = useCallback(async (device: Device) => { // Nhận Device đã xử lý từ map
+    console.log(`Opening modal in 'edit' mode for device: ${device.id}`);
+    setIsLoading(true);
+    try {
+      // Fetch lại để lấy dữ liệu mới nhất, nhưng API trả về DeviceFromAPI
+      const response = await apiClient.get<ApiResponse<DeviceFromAPI>>(`/devices/${device.id}`);
+       console.log("<<< Response from GET /devices/{id} for Edit:", response.data);
+      if (response.data?.data) {
+        // <<< THÊM: Xử lý dữ liệu API trả về >>>
+        const processedDevice = processDeviceData(response.data.data);
+         // Kiểm tra lại sau khi xử lý
+         if (processedDevice.type === undefined || processedDevice.isSensor === undefined) {
+             console.error(`Processed device ${processedDevice.id} is still missing 'type' or 'isSensor'! Check deviceUtils.`);
+             toast.error("Failed to process device data for editing.");
+             setIsLoading(false);
+             return;
+         }
+
+        const detailedDevice = {
+          ...processedDevice, // <<< Dùng dữ liệu ĐÃ XỬ LÝ
+          // Ưu tiên state realtime
+          state: realtimeStatesRef.current[device.id]?.state ?? processedDevice.state,
+        };
+         console.log("<<< Data being set to selectedDevice for Edit:", detailedDevice);
+        setSelectedDevice(detailedDevice); // <<< selectedDevice giờ là kiểu Device đầy đủ
+        setModalMode('edit');
+        setShowDeviceModal(true);
+      } else {
+        toast.error("Could not load device details (no data).");
+      }
+    }  catch (error: unknown) {
+      console.error("An error occurred while fetching device details:", error);
+    }
+    finally { setIsLoading(false); }
+  }, [realtimeStates]);
+
+ // Đóng modal chung
+ const closeDeviceModal = useCallback(() => {
+  console.log("Closing device modal");
+  setShowDeviceModal(false);
+  setModalMode(null);
+  setSelectedDevice(null);
+}, []);
+const handleDeviceUpdate = useCallback((updatedDeviceData: Device) => { // Nhận Device đầy đủ
+  console.log("Updating device list state with:", updatedDeviceData);
+  setDevices(prevDevices => {
+    if (!prevDevices) return null;
+     // Phải map lại vì updatedDeviceData có thể chỉ là Partial<Device> nếu PUT ko trả về hết
+     // Cách an toàn nhất là đảm bảo object thay thế là Device đầy đủ
+    return prevDevices.map(dev =>
+      dev.id === updatedDeviceData.id ? { ...dev, ...updatedDeviceData } : dev
+    );
+  });
+  // Cập nhật realtime state nếu cần
+   if (updatedDeviceData.state) {
+       setRealtimeStates(prev => ({...prev, [updatedDeviceData.id]: { ...prev[updatedDeviceData.id], state: updatedDeviceData.state }}));
+   }
+}, []);
+
+   // Xử lý lưu (Thêm hoặc Sửa) - Được gọi từ AddEditDeviceModal
+   const handleSaveDevice = useCallback(async (deviceData: DeviceDTO, mode: 'add' | 'edit') => {
+    console.log(`Saving device in mode: ${mode}`, deviceData); // <<< Log này cho thấy deviceData từ modal có type/isSensor
+    try {
+        let response;
+        let successMessage = "";
+
+        if (mode === 'add') {
+            // ... logic POST ...
+        } else if (mode === 'edit') {
+             if (!selectedDevice?.id) { // <<< Dùng selectedDevice
+                  throw new Error("Cannot update device: No device selected or missing ID.");
+             }
+
+             // <<< QUAN TRỌNG: TẠO PAYLOAD ĐÚNG Ở ĐÂY >>>
+             const putPayload: DeviceDTO = {
+                 id: selectedDevice.id, // Có thể không cần id trong body, nhưng đưa vào cho đủ DTO
+                 feed: deviceData.feed, // Lấy từ form
+                 adaUsername: deviceData.adaUsername, // Lấy từ form
+                 adaApikey: deviceData.adaApikey, // Lấy từ form (có thể undefined)
+                 deviceConfig: deviceData.deviceConfig ?? {}, // Lấy từ form
+
+                 // Lấy các trường bắt buộc, không đổi từ selectedDevice gốc (đã được xử lý)
+                 type: selectedDevice.type,       // <<< PHẢI CÓ
+                 isSensor: selectedDevice.isSensor, // <<< PHẢI CÓ
+                 state: selectedDevice.state,     // <<< PHẢI CÓ (Theo DTO backend)
+             };
+
+             // Xử lý API Key nếu cần (ví dụ: gửi key cũ nếu form trống và backend yêu cầu)
+             if (!putPayload.adaApikey && selectedDevice.adaApikey) {
+                 // Nếu backend yêu cầu @NotBlank, phải gửi key cũ nếu form trống
+                 // putPayload.adaApikey = selectedDevice.adaApikey;
+                 // Nếu backend cho phép null/blank khi update thì không cần dòng trên
+             }
+             // Xóa ID khỏi payload nếu API chỉ nhận ID qua URL
+             // delete putPayload.id;
+             if (!putPayload.adaApikey) { // Kiểm tra xem người dùng có nhập key mới không
+              console.log("[Save] API Key form input is blank/null. Using original key from selectedDevice.");
+              // Nếu key trong form trống, LẤY LẠI KEY CŨ từ selectedDevice để gửi đi
+              // (Vì backend yêu cầu @NotBlank, không thể gửi trống hoặc thiếu)
+              putPayload.adaApikey = selectedDevice.adaApikey ?? ''; // Lấy key cũ, nếu cũ cũng null thì gửi chuỗi rỗng
+          } else {
+               console.log("[Save] API Key provided in form, using new key.");
+          }
+          
+          // 4. Kiểm tra lần cuối trước khi gửi (DEBUG)
+          if (!putPayload.adaApikey) {
+               console.error("!!! CRITICAL: adaApikey is STILL empty/null before sending PUT request!", putPayload);
+               // Có thể dừng ở đây hoặc báo lỗi cụ thể hơn
+          }
+          
+             console.log("Payload for PUT (Actual Sent Data):", JSON.stringify(putPayload, null, 2)); // <<< Log payload cuối cùng
+             response = await apiClient.put<ApiResponse<unknown>>(`/devices/${selectedDevice.id}`, putPayload); // <<< Gửi putPayload đã đầy đủ
+             // ... xử lý success, update state local ...
+             successMessage = response.data?.message || "Device updated successfully!";
+             toast.success(successMessage);
+             const updatedDeviceForState: Device = {
+                 id: selectedDevice.id,
+                 feed: selectedDevice.feed,
+                 adaUsername: selectedDevice.adaUsername,
+                 adaApikey: selectedDevice.adaApikey,
+                 deviceConfig: selectedDevice.deviceConfig,
+                 type: selectedDevice.type,
+                 isSensor: selectedDevice.isSensor,
+                 state: selectedDevice.state,
+             };
+             handleDeviceUpdate(updatedDeviceForState);
+             closeDeviceModal();
+
+        } else {
+            throw new Error("Invalid mode.");
+        }
+    } catch (error: unknown) { /* ... Xử lý lỗi như cũ ... */
+         console.error(`Error ${mode === 'add' ? 'adding' : 'updating'} device:`, error);
+         // ... (logic báo lỗi toast như cũ) ...
+        // Quan trọng: Ném lỗi lại để modal biết và không tự đóng
+        throw error; // <<< Ném lỗi lại
+     } finally {
+      // setIsLoading(false);
+    }
+  }, [loadDevices, handleDeviceUpdate, selectedDevice, closeDeviceModal]); // Thêm dependency
+  // Xử lý xóa device
+  const handleDeleteDevice = useCallback(async (deviceId: string, deviceFeed?: string) => {
+    console.log(`Attempting to delete device: ${deviceId} (${deviceFeed})`);
+    setShowConfirmDeleteModal(false); // Đóng modal xác nhận
+    setDeviceToDelete(null);
+    // setIsLoading(true); // Dùng loading riêng cho delete nếu muốn
+
+    try {
+        const response = await apiClient.delete<ApiResponse<unknown>>(`/devices/${deviceId}`);
+        toast.success(response.data?.message || `Device ${deviceFeed || deviceId} deleted successfully!`);
+        setDevices(prevDevices => prevDevices ? prevDevices.filter(dev => dev.id !== deviceId) : null);
+        // Đóng modal edit nếu đang mở cho device này
+        if (selectedDevice?.id === deviceId) {
+            closeDeviceModal();
+        }
+    } catch (error: unknown) {
+      console.error("An error occurred while deleting the device:", error);
+      toast.error("Failed to delete the device. Please try again.");
+    }
+    finally { /* setIsLoading(false); */ }
+  }, [selectedDevice, closeDeviceModal]);
+
+  // Mở modal xác nhận xóa
+  const openConfirmDeleteModal = (device: Device) => {
+       setDeviceToDelete(device);
+       setShowConfirmDeleteModal(true);
+  };
+
+  // Xác nhận xóa
+  const confirmDelete = () => {
+       if (deviceToDelete) {
+           handleDeleteDevice(deviceToDelete.id, deviceToDelete.feed);
+       }
+  };
 
   const handleToggleDevice = (device: Device) => {
     // Bỏ async nếu chỉ dùng WS
@@ -313,8 +512,6 @@ export default function DashboardPage() {
     }));
 
     // --- Bước 2: Gửi lệnh qua WebSocket ---
-    // Gửi action là "TOGGLE" thay vì "set_state"
-    // Vẫn giữ lại value vì backend có thể cần nó (hoặc bỏ qua nếu không cần)
     const command: DeviceCommand = { action: "TOGGLE", value: newState };
     console.log(`[WS] Sending command to ${device.id}:`, command);
     try {
@@ -332,35 +529,31 @@ export default function DashboardPage() {
       }));
     }
   };
+  const handleSetSpeed = useCallback((device: Device, speed: number) => {
+    if (!session) {
+      toast.warn("Authentication required.");
+      return;
+    }
+    // Có thể thêm kiểm tra min/max speed từ device.deviceConfig nếu muốn
+    const speedValue = String(Math.round(speed)); // Gửi dạng string, làm tròn
 
-  const handleDeviceClick = (device: Device) => {
-    // Lấy thông tin chi tiết nhất (có thể fetch lại hoặc dùng data hiện có)
-    // Ví dụ: fetch lại để đảm bảo data mới nhất
-    apiClient
-      .get<ApiResponse<Device>>(`/devices/${device.id}`)
-      .then((response) => {
-        if (response.data?.data) {
-          // Kết hợp state realtime vào dữ liệu chi tiết trước khi mở modal
-          const detailedDevice = {
-            ...response.data.data,
-            state: realtimeStates[device.id]?.state ?? response.data.data.state, // Ưu tiên state realtime
-          };
-          setSelectedDevice(detailedDevice);
-        } else {
-          toast.error("Could not load device details.");
-        }
-      })
-      .catch((error) => {
-        console.error(`Error fetching details for ${device.id}:`, error);
-        toast.error(
-          `Failed to load details: ${
-            error.response?.data?.message || error.message
-          }`
-        );
-      });
-    // Hoặc đơn giản là hiển thị data đã có:
-    // setSelectedDevice({ ...device, state: realtimeStates[device.id]?.state ?? device.state });
-  };
+    const command: DeviceCommand = { action: "SET_SPEED", value: speedValue };
+    console.log(`[WS] Sending SET_SPEED to ${device.id}:`, command);
+    try {
+      publishToDevice(device.id, command);
+       // Không cần optimistic update ở đây, giá trị sẽ cập nhật khi WS trả về
+       // Có thể thêm toast nhẹ nhàng thông báo lệnh đã gửi
+       toast.info(`Sent speed command (${speedValue}%) to ${device.feed}`);
+    } catch (wsError) {
+      console.error(`[WS] Error publishing SET_SPEED for ${device.id}:`, wsError);
+      toast.error(
+        `Failed to send speed command to device ${device.feed}. Check connection.`
+      );
+    }
+  }, [session]); // Phụ thuộc vào session
+
+  
+  
 
   //============== VIDEO PLAYER ==================================================================================
 
@@ -550,7 +743,7 @@ export default function DashboardPage() {
               onError={onPlayerError}
             />
           </div>
-
+          
           {/* === KHU VỰC ĐIỀU KHIỂN TÙY CHỈNH === */}
           <div className={styles.customControls}>
             {/* Thanh tiến trình */}
@@ -609,50 +802,64 @@ export default function DashboardPage() {
       <h2 className={styles.deviceListTitle}>Thiết bị của tôi</h2>
       {/* Lưới thiết bị hoặc thông báo khi không có thiết bị */}
       <div className={styles.deviceGrid}>
-        {" "}
-        {/* Lưới thiết bị */}
-        {devices.length === 0 && !showAddDeviceModal && (
-          <div className={styles.noDevices}>
-            {" "}
-            {/* Box thông báo */}
-            <p>Bạn chưa có thiết bị nào.</p>
-            {/* Áp class riêng cho nút để style */}
-            <button
-              onClick={() => setShowAddDeviceModal(true)}
-              className={styles.addButton}
-            >
-              Thêm thiết bị đầu tiên
-            </button>
+        {devices.length === 0 && (
+          <div className="text-gray-500 text-center">
+            No devices available. Please add a new device.
           </div>
         )}
-        {devices.length > 0 &&
-          devices.map((device) => (
-            <DeviceCard
-              key={device.id}
-              device={device}
-              currentState={realtimeStates[device.id]?.state}
-              currentValue={realtimeStates[device.id]?.value}
-              onToggle={() => handleToggleDevice(device)}
-              onClick={() => handleDeviceClick(device)}
-              // Component DeviceCard cần import và sử dụng deviceCard.module.scss
-            />
-          ))}
+        {devices.map((device) => {
+            // <<< Logic xác định loại thiết bị DỰA TRÊN DỮ LIỆU TỪ API >>>
+             // QUAN TRỌNG: Đảm bảo device.isSensor và device.type có giá trị hợp lệ
+             if (device.isSensor === undefined || device.type === undefined) {
+                  console.warn(`Device ${device.id} (${device.feed}) has invalid type/isSensor. Rendering potentially incorrect card.`);
+                  // return null; // Hoặc render card lỗi
+             }
+            const isSensor = !!device.isSensor; // Ép kiểu boolean an toàn
+            const isTempActuator = device.type === 'TEMP' && !isSensor;
+
+            return (
+              <DeviceCard
+                key={device.id}
+                device={device}
+                isSensor={isSensor} // <<< Truyền isSensor xuống
+                currentState={realtimeStates[device.id]?.state}
+                currentValue={realtimeStates[device.id]?.value}
+                // Callbacks
+                onToggle={!isSensor ? () => handleToggleDevice(device) : () => {}}
+                onClick={() => openEditModal(device)} // Mở modal edit
+                onSetSpeed={isTempActuator ? (speed) => handleSetSpeed(device, speed) : undefined}
+                onDeleteRequest={() => openConfirmDeleteModal(device)} // <<< Mở confirm modal
+                // onShowChart={isSensor ? () => handleShowChart(device.id) : undefined} // Chart để sau
+                // Config props
+                minSpeed={isTempActuator ? Number(device.deviceConfig?.['minSpeed'] ?? 0) : undefined}
+                maxSpeed={isTempActuator ? Number(device.deviceConfig?.['maxSpeed'] ?? 100) : undefined}
+              />
+            );
+          })}
       </div>
-      {/* Modals (Giữ nguyên) */}
+
+      {/* Modal Thêm/Sửa Chung */}
       <AddEditDeviceModal
-        isOpen={showAddDeviceModal}
-        onClose={() => setShowAddDeviceModal(false)}
-        onSuccess={handleModalSuccess}
-        initialData={null}
-        defaultAdaUsername={process.env.NEXT_PUBLIC_ADA_USERNAME || ""}
-        defaultAdaApiKey={process.env.NEXT_PUBLIC_ADA_API_KEY || ""}
+          isOpen={showDeviceModal}
+          onClose={closeDeviceModal}
+          mode={modalMode}
+          initialData={selectedDevice} // null cho 'add', device data cho 'edit'
+          onSave={handleSaveDevice} // <<< Hàm xử lý lưu mới
+          // Truyền các props khác nếu AddEditDeviceModal cần
+           defaultAdaUsername={process.env.NEXT_PUBLIC_ADA_USERNAME || ""}
+           defaultAdaApiKey={process.env.NEXT_PUBLIC_ADA_API_KEY || ""}
       />
-      <DeviceDetailsModal
-        isOpen={!!selectedDevice}
-        onClose={() => setSelectedDevice(null)}
-        device={selectedDevice}
-        // Component DeviceDetailsModal cần style riêng (ví dụ modal.module.scss)
-      />
+
+       {/* Modal Xác nhận Xóa */}
+       <ConfirmationModal
+           isOpen={showConfirmDeleteModal}
+           onClose={() => setShowConfirmDeleteModal(false)}
+           onConfirm={confirmDelete} // <<< Hàm xác nhận xóa
+           title="Confirm Deletion"
+           // Sử dụng optional chaining và default value
+           message={`Are you sure you want to delete the device "${deviceToDelete?.feed || 'N/A'}"? This action cannot be undone.`}
+       />
+
     </div>
   );
 }

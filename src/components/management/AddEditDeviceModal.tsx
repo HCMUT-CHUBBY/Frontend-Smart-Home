@@ -1,589 +1,369 @@
-// app/(protected)/manage-devices/components/AddEditDeviceModal.tsx
-import React, { useState, useEffect, FormEvent, useCallback } from 'react';
+// components/dashboard/AddEditDeviceModal.tsx
+import React, { useState, useEffect, FormEvent, useCallback} from 'react';
 import Modal from '@/components/ui/Modal';
-import { Device, DeviceDTO } from '@/lib/types';
-import apiClient from '@/lib/apiClient';
-import axios from 'axios';
-import { Save, X, AlertCircle, Server, ChevronDown, Eye, EyeOff, Info, Thermometer, Lightbulb, ExternalLink, HelpCircle /* Thêm icon này */ } from 'lucide-react';
+import { Device, DeviceDTO } from '@/lib/types'; // Đảm bảo types đã cập nhật isSensor
+import { Save, X, AlertCircle, Server, ChevronDown, Eye, EyeOff,  Thermometer, Lightbulb, Trash2 } from 'lucide-react';
+import styles from '@/styles/AddEditDeviceModal.module.scss'; // <<< Tạo file SCSS mới này
+import commonStyles from '@/styles/Common.module.scss'; // Nếu dùng
 
+// Định nghĩa kiểu cho việc chọn loại thiết bị
+type DeviceCategory = 'LIGHT_SENSOR' | 'TEMP_SENSOR' | 'LIGHT_ACTUATOR' | 'TEMP_ACTUATOR';
+
+// Props Interface cập nhật
 interface AddEditDeviceModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => Promise<void>;
-  initialData?: Device | null;
+  mode: 'add' | 'edit' | null; // <<< Bổ sung mode
+  initialData?: Device | null; // <<< Dữ liệu ban đầu khi edit
+  onSave: (deviceData: DeviceDTO, mode: 'add' | 'edit') => Promise<void>; // <<< Callback lưu
+  onDelete?: (deviceId: string) => void; // <<< Callback xóa (optional)
   defaultAdaUsername: string;
   defaultAdaApiKey: string;
 }
 
 const AddEditDeviceModal: React.FC<AddEditDeviceModalProps> = ({
-  isOpen, onClose, onSuccess, initialData, defaultAdaUsername, defaultAdaApiKey
+  isOpen, onClose, mode, initialData, onSave, onDelete, defaultAdaUsername, defaultAdaApiKey
 }) => {
-  // --- State Variables ---
+  // Form fields state
   const [feed, setFeed] = useState('');
-  // --- THAY ĐỔI: State isSensor sẽ do người dùng chọn khi Add ---
-  const [isSensor, setIsSensor] = useState(true); // Vẫn giữ state, giá trị ban đầu khi Add sẽ là true
-  // ----------------------------------------------------------
-  const [type, setType] = useState<'TEMP' | 'LIGHT'>('TEMP');
-  const [state, setState] = useState<'ON' | 'OFF'>('OFF');
   const [adaUsername, setAdaUsername] = useState('');
   const [adaApiKey, setAdaApiKey] = useState('');
-  const [minTemp, setMinTemp] = useState<string>('');
-  const [maxTemp, setMaxTemp] = useState<string>('');
-  const [lightThreshold, setLightThreshold] = useState<string>('');
+  // Loại thiết bị (quan trọng)
+  const [deviceCategory, setDeviceCategory] = useState<DeviceCategory>('LIGHT_SENSOR');
+  // State cho các trường config cụ thể
+  const [configMin, setConfigMin] = useState<string | number>('');
+  const [configMax, setConfigMax] = useState<string | number>('');
+  const [configMinSpeed, setConfigMinSpeed] = useState<string | number>('');
+  const [configMaxSpeed, setConfigMaxSpeed] = useState<string | number>('');
+  const [configThreshold, setConfigThreshold] = useState<string | number>('');
+  const [configInitialState, setConfigInitialState] = useState<'ON' | 'OFF'>('OFF'); // State ban đầu chỉ cho actuator
+
+  // UI state
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [configErrors, setConfigErrors] = useState<{ [key: string]: string }>({});
   const [showPassword, setShowPassword] = useState(false);
-  const [activeField, setActiveField] = useState<string | null>(null);
   const [formTouched, setFormTouched] = useState(false);
 
-  const isEditing = !!initialData;
-
-  // Effect khởi tạo/reset form
+  const isEditing = mode === 'edit';
+  // --- Khởi tạo/Reset Form ---
+  const resetForm = useCallback(() => {
+    setFeed('');
+    setAdaUsername(defaultAdaUsername);
+    setAdaApiKey(defaultAdaApiKey); // Không nên set key cũ khi edit ở đây
+    setDeviceCategory('LIGHT_SENSOR');
+    setConfigMin('');
+    setConfigMax('');
+    setConfigMinSpeed('');
+    setConfigMaxSpeed('');
+    setConfigThreshold('');
+    setConfigInitialState('OFF');
+    setIsLoading(false);
+    setError(null);
+    setFormTouched(false);
+    setShowPassword(false);
+}, [defaultAdaUsername, defaultAdaApiKey]);
+  // Initialize form when modal opens
+  // Khởi tạo form dựa trên mode và initialData
   useEffect(() => {
     if (isOpen) {
-      let initialConfig: Record<string, string | number> = {};
-      let initialType: 'TEMP' | 'LIGHT' = 'TEMP';
-      let initialIsSensor = true; // Mặc định khi Add
+        setError(null); // Luôn xóa lỗi cũ khi mở
+        setFormTouched(false);
+        setIsLoading(false);
+        setShowPassword(false);
 
-      if (isEditing && initialData) {
-        setFeed(initialData.feed);
-        // --- THAY ĐỔI: Lấy isSensor từ initialData khi Edit ---
-        initialIsSensor = initialData.isSensor;
-        setIsSensor(initialData.isSensor);
-        // --------------------------------------------------
-        initialType = initialData.type === 'LIGHT' ? 'LIGHT' : 'TEMP';
-        setType(initialType);
-        setState(initialData.state);
-        setAdaUsername(initialData.adaUsername);
-        setAdaApiKey(initialData.adaApikey);
-        initialConfig = Object.fromEntries(
-          Object.entries(initialData.deviceConfig || {}).map(([key, value]) => [
-            key,
-            Array.isArray(value) ? value.join(',') : value,
-          ])
-        );
-      } else {
-        // Chế độ Add: Reset về mặc định
-        setFeed('');
-        // --- THAY ĐỔI: Đặt giá trị isSensor mặc định ban đầu khi Add ---
-        initialIsSensor = true; // Có thể đổi thành false nếu muốn mặc định là Device
-        setIsSensor(initialIsSensor);
-        // ----------------------------------------------------------
-        initialType = 'TEMP'; // Mặc định là TEMP khi thêm mới
-        setType('TEMP');
-        setState('OFF');
-        setAdaUsername(defaultAdaUsername);
-        setAdaApiKey(defaultAdaApiKey);
-        initialConfig = {};
-      }
+        if (isEditing && initialData) {
+            console.log("[Modal Effect - Edit] Initializing with data:", initialData);
+            // --- Xác định DeviceCategory từ initialData ---
+            let category: DeviceCategory = 'LIGHT_SENSOR'; // Default
+            if (initialData.type === 'LIGHT') {
+                category = initialData.isSensor ? 'LIGHT_SENSOR' : 'LIGHT_ACTUATOR';
+            } else if (initialData.type === 'TEMP') {
+                category = initialData.isSensor ? 'TEMP_SENSOR' : 'TEMP_ACTUATOR';
+            }
+             console.log("Determined category:", category);
+            setDeviceCategory(category);
 
-      // Reset config fields dựa trên initialType và initialIsSensor
-      // (Logic này giữ nguyên, chỉ cần đảm bảo initialType đúng)
-      if (initialType === 'TEMP') {
-          setMinTemp(String(initialConfig.min_temp ?? ''));
-          setMaxTemp(String(initialConfig.max_temp ?? ''));
-          setLightThreshold('');
-      } else if (initialType === 'LIGHT') {
-          setLightThreshold(String(initialConfig.light_threshold ?? ''));
-          setMinTemp('');
-          setMaxTemp('');
-      } else {
-          setMinTemp(''); setMaxTemp(''); setLightThreshold('');
-      }
+            // --- Điền các trường cơ bản ---
+            setFeed(initialData.feed);
+            setAdaUsername(initialData.adaUsername);
+            setAdaApiKey(''); // Để trống ô API key, người dùng nhập nếu muốn đổi
+            setConfigInitialState(initialData.state || 'OFF'); // Lấy state hiện tại làm initial state nếu edit actuator
 
-      // Reset các state UI
-      setIsLoading(false);
-      setError(null);
-      setConfigErrors({});
-      setFormTouched(false);
-      setActiveField(null);
-      setShowPassword(false);
+            // --- Điền các trường config ---
+            const cfg = initialData.deviceConfig || {};
+            setConfigMin((cfg['min'] as string | number) ?? ''); // Dùng các key thống nhất
+            setConfigMax(typeof cfg['max'] === 'string' || typeof cfg['max'] === 'number' ? cfg['max'] : '');
+            setConfigMinSpeed((cfg['minSpeed'] as string | number) ?? '');
+            setConfigMaxSpeed(typeof cfg['maxSpeed'] === 'string' || typeof cfg['maxSpeed'] === 'number' ? cfg['maxSpeed'] : '');
+            setConfigThreshold(typeof cfg['threshold'] === 'string' || typeof cfg['threshold'] === 'number' ? cfg['threshold'] : '');
+
+        } else {
+             console.log("[Modal Effect - Add] Resetting form.");
+            resetForm(); // Reset hoàn toàn cho mode 'add'
+            setAdaUsername(defaultAdaUsername); // Set default lại
+            setAdaApiKey(defaultAdaApiKey);
+        }
     }
-  }, [isOpen, isEditing, initialData, defaultAdaUsername, defaultAdaApiKey]);
+}, [isOpen, isEditing, initialData, resetForm, defaultAdaUsername, defaultAdaApiKey]);
 
-   // Effect dọn dẹp config fields khi type HOẶC isSensor thay đổi TRONG KHI THÊM MỚI
-   useEffect(() => {
-    if (isOpen && !isEditing) {
-        // Nếu chuyển sang TEMP, xóa config LIGHT
-        if (type === 'TEMP') {
-            setLightThreshold('');
-        }
-        // Nếu chuyển sang LIGHT, xóa config TEMP
-        else if (type === 'LIGHT') {
-            setMinTemp('');
-            setMaxTemp('');
-        }
-        // Nếu chuyển sang Sensor, xóa config LIGHT (vì sensor ánh sáng không có ngưỡng)
-        // Sensor nhiệt độ vẫn giữ min/max
-        if (isSensor && type === 'LIGHT') {
-             setLightThreshold('');
-        }
-
-        // Nếu không phải Sensor (là Device), thì phải có State
-        // Nếu là Sensor, không cần State (có thể ẩn đi)
-        // State 'ON'/'OFF' không cần xóa khi đổi type/isSensor, chỉ ẩn/hiện UI
-
-        setConfigErrors({}); // Reset lỗi config khi đổi type/isSensor
+  // Update isSensor when type changes
+  
+  // Form validation
+  const validateForm = (): boolean => {
+    if (!feed.trim()) { setError("Feed name is required"); return false; }
+    if (!adaUsername.trim()) { setError("Adafruit Username is required"); return false; }
+    // API Key chỉ bắt buộc khi thêm mới HOẶC khi người dùng cố tình sửa và để trống
+    // Khi edit, để trống nghĩa là giữ key cũ (logic gửi PUT sẽ xử lý)
+    if (mode === 'add' && !adaApiKey.trim()) {
+        setError("Adafruit API Key is required for new device");
+        return false;
     }
-}, [type, isSensor, isOpen, isEditing]); // Thêm isSensor vào dependency
+    // Thêm validation cho các trường config nếu cần (ví dụ min < max)
+    return true;
+};
 
 
-  // --- Validation ---
-  // (validateBasicForm giữ nguyên)
-   const validateBasicForm = (): boolean => {
-       let isValid = true;
-       if (!feed.trim()) isValid = false;
-       if (!adaUsername.trim()) isValid = false;
-       if (!adaApiKey.trim()) isValid = false;
-       return isValid;
-   };
-
-  // (validateAndBuildConfig giữ nguyên, vì nó dựa trên type và các giá trị config)
-   const validateAndBuildConfig = useCallback((): { config: Record<string, string>; errors: { [key: string]: string } } => {
-    const currentErrors: { [key: string]: string } = {};
-    const configData: Record<string, string> = {};
-    let minTempValue: number | undefined = undefined;
-    let maxTempValue: number | undefined = undefined;
-
-    // Chỉ validate config nếu là Sensor và Type là TEMP, hoặc nếu là Device (ko phải sensor)
-    // Vì Sensor LIGHT thường không có config min/max/threshold
-    if ((isSensor && type === 'TEMP') || !isSensor) {
-        if (type === 'TEMP') {
-            // Validate Min Temp
-            if (minTemp.trim() !== '') {
-                const min = parseFloat(minTemp);
-                if (isNaN(min)) {
-                    currentErrors.minTemp = 'Min temp must be a number.';
-                } else {
-                    configData.min_temp = minTemp.trim();
-                    minTempValue = min;
-                }
-            }
-            // Validate Max Temp
-            if (maxTemp.trim() !== '') {
-                const max = parseFloat(maxTemp);
-                if (isNaN(max)) {
-                    currentErrors.maxTemp = 'Max temp must be a number.';
-                } else {
-                    configData.max_temp = maxTemp.trim();
-                    maxTempValue = max;
-                }
-            }
-            // Validate Min < Max
-            if (minTempValue !== undefined && maxTempValue !== undefined) {
-                if (minTempValue >= maxTempValue) {
-                    currentErrors.maxTemp = 'Max temp must be greater than min temp.';
-                    delete configData.min_temp; // Xóa khỏi config nếu logic sai
-                    delete configData.max_temp;
-                }
-            }
-        } else if (type === 'LIGHT' && !isSensor) { // Chỉ validate threshold cho Light Device
-            // Validate Light Threshold
-            if (lightThreshold.trim() !== '') {
-                const threshold = parseFloat(lightThreshold);
-                if (isNaN(threshold)) {
-                    currentErrors.lightThreshold = 'Threshold must be a number.';
-                } else if (threshold < 0) {
-                    currentErrors.lightThreshold = 'Threshold cannot be negative.';
-                } else {
-                    configData.light_threshold = lightThreshold.trim();
-                }
-            }
-        }
-    } // End if validate config
-
-    setConfigErrors(currentErrors);
-    return { config: configData, errors: currentErrors };
-}, [type, isSensor, minTemp, maxTemp, lightThreshold]); // Thêm isSensor
-
-
-  // --- Event Handlers ---
-  // (handleFocus, handleBlur, togglePasswordVisibility, getTypeIcon giữ nguyên)
-   const handleFocus = (fieldName: string) => { setActiveField(fieldName); };
-   const handleBlur = () => { setActiveField(null); };
-   const togglePasswordVisibility = () => { setShowPassword(!showPassword); };
-   const getTypeIcon = (deviceType: 'TEMP' | 'LIGHT'): React.ReactNode => {
-       return deviceType === 'TEMP' ? (
-           <Thermometer size={18} className="text-blue-500" />
-       ) : (
-           <Lightbulb size={18} className="text-yellow-500" />
-       );
-   };
-
-  // Xử lý khi submit form
+  // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
     setFormTouched(true);
 
-    const basicValid = validateBasicForm();
-    const { config: finalDeviceConfig, errors: configValidationErrors } = validateAndBuildConfig();
-
-    if (!basicValid || Object.keys(configValidationErrors).length > 0) {
-      console.error("Validation Failed:", { basicValid, configValidationErrors });
-      setError("Please fix the errors highlighted in the form.");
-      return;
-    }
+    if (!validateForm()) return;
 
     setIsLoading(true);
+
+    // --- Xác định type và isSensor từ deviceCategory ---
+    let type: 'TEMP' | 'LIGHT';
+    let isSensor: boolean;
+    switch (deviceCategory) {
+        case 'LIGHT_SENSOR': type = 'LIGHT'; isSensor = true; break;
+        case 'TEMP_SENSOR': type = 'TEMP'; isSensor = true; break;
+        case 'LIGHT_ACTUATOR': type = 'LIGHT'; isSensor = false; break;
+        case 'TEMP_ACTUATOR': type = 'TEMP'; isSensor = false; break;
+        default: type = 'LIGHT'; isSensor = true; // Fallback không nên xảy ra
+    }
+
+    // --- Xây dựng deviceConfig từ state ---
+    const finalDeviceConfig: Record<string, number|string> = {};
+    if (isSensor) {
+        if (configMin !== '') finalDeviceConfig.min = Number(configMin); // Chuyển về số nếu có thể
+        if (configMax !== '') finalDeviceConfig.max = Number(configMax);
+    } else if (deviceCategory === 'TEMP_ACTUATOR') {
+        if (configMinSpeed !== '') finalDeviceConfig.minSpeed = Number(configMinSpeed);
+        if (configMaxSpeed !== '') finalDeviceConfig.maxSpeed = Number(configMaxSpeed);
+        if (configThreshold !== '') finalDeviceConfig.threshold = Number(configThreshold);
+    }
+
+    // --- Tạo DeviceDTO payload ---
     const deviceDataPayload: DeviceDTO = {
-      ...(isEditing && initialData && { id: initialData.id }),
-      feed: feed.trim(),
-      type,
-      // --- THAY ĐỔI: Chỉ gửi state nếu là Device ---
-      state: !isSensor ? state : 'OFF', // Gửi state đã chọn nếu là Device, gửi OFF (hoặc null tùy backend) nếu là Sensor
-      // --------------------------------------------
-      adaUsername: adaUsername.trim(),
-      adaApikey: adaApiKey.trim(),
-      // --- THAY ĐỔI: Lấy isSensor trực tiếp từ state ---
-      isSensor: isSensor, // Gửi giá trị true/false từ state isSensor
-      // -----------------------------------------------
-      // Chỉ gửi deviceConfig nếu nó không rỗng
-      deviceConfig: Object.keys(finalDeviceConfig).length > 0 ? finalDeviceConfig : {},
+        // id chỉ thêm vào khi edit
+        ...(isEditing && initialData && { id: initialData.id }),
+        feed: feed.trim(),
+        type: type,
+        isSensor: isSensor,
+        // state chỉ quan trọng khi thêm mới actuator, khi edit thì không nên gửi qua DTO này
+        state: (mode === 'add' && !isSensor) ? configInitialState : (initialData?.state || 'OFF'), // State ban đầu cho add, state gốc cho edit
+        adaUsername: adaUsername.trim(),
+        // adaApikey chỉ gửi nếu có giá trị (khác rỗng)
+        ...(adaApiKey.trim() && { adaApikey: adaApiKey.trim() }),
+        deviceConfig: finalDeviceConfig,
     };
 
-    console.log("--- Submitting Payload ---");
-    console.log(JSON.stringify(deviceDataPayload, null, 2));
-
-    const apiCall = isEditing
-        ? apiClient.put(`/devices/${initialData!.id}`, deviceDataPayload)
-        : apiClient.post('/devices', deviceDataPayload);
-
-    const failureMessagePrefix = isEditing ? 'Failed to update device' : 'Failed to add device';
-
     try {
-      const response = await apiCall;
-      console.log("API Response:", response.data);
-      await onSuccess();
+        // Gọi callback onSave được truyền từ DashboardPage
+        await onSave(deviceDataPayload, mode!); // Truyền cả mode
+        // DashboardPage sẽ xử lý đóng modal và load lại data nếu thành công
     } catch (err: unknown) {
-      console.error(`${failureMessagePrefix}:`, err);
-      let specificErrorMessage = "An unexpected error occurred. Check console for details.";
-      if (axios.isAxiosError(err)) {
-        if (err.response) {
-          const responseData = err.response.data;
-          specificErrorMessage = responseData?.message || responseData?.errorMessage || JSON.stringify(responseData);
-          console.error("Backend Error Response:", responseData);
-        } else if (err.request) {
-          specificErrorMessage = "Could not connect to the server. Please check your network or contact support.";
-        } else {
-          specificErrorMessage = `Error setting up request: ${err.message}`;
+        // Lỗi đã được xử lý và báo toast ở DashboardPage, chỉ cần set lỗi cục bộ nếu muốn
+        const specificError = (err as { response?: { data?: { message?: string, detail?: string } } })?.response?.data;
+        setError(specificError?.detail || specificError?.message || (err instanceof Error ? err.message : "An unexpected error occurred."));
+        console.error("Submit error caught in modal:", err);
+        setIsLoading(false); // Dừng loading ở modal khi có lỗi
+        if (!formTouched) {
+         console.log("Please make changes before submitting.");
+          return;
         }
-      } else if (err instanceof Error) {
-        specificErrorMessage = err.message;
-      }
-      setError(`${failureMessagePrefix}. Error: ${specificErrorMessage}`);
-    } finally {
-      setIsLoading(false);
     }
-  };
+    // Không gọi setIsLoading(false) ở đây nếu không có lỗi, vì DashboardPage sẽ đóng modal
+};
+const handleDelete = () => {
+  if (isEditing && initialData && onDelete) {
+      // Có thể thêm xác nhận nội bộ ở đây hoặc dựa vào modal xác nhận ở DashboardPage
+      console.log(`Requesting delete for device: ${initialData.id}`);
+      onDelete(initialData.id); // Gọi callback xóa truyền từ DashboardPage
+  }
+};
+  // Input field focus handlers
+ 
 
+  // Toggle password visibility
+  const togglePasswordVisibility = () => setShowPassword(!showPassword);
+  // Hàm chọn icon dựa trên category (ví dụ)
+    const getCategoryIcon = (category: DeviceCategory) => {
+        switch (category) {
+            case 'LIGHT_SENSOR': return <Lightbulb size={18} className="text-yellow-500" />;
+            case 'TEMP_SENSOR': return <Thermometer size={18} className="text-blue-500" />;
+            case 'LIGHT_ACTUATOR': return <Lightbulb size={18} className="text-orange-500" />; // Màu khác cho actuator
+            case 'TEMP_ACTUATOR': return <Thermometer size={18} className="text-red-500" />; // Màu khác cho actuator
+            default: return <Server size={18} className="text-gray-500" />;
+        }
+   };
+  function setDeviceConfigValue(config: Record<string, number | string>) {
+    if ('min' in config) setConfigMin(config.min);
+    if ('max' in config) setConfigMax(config.max);
+    if ('minSpeed' in config) setConfigMinSpeed(config.minSpeed);
+    if ('maxSpeed' in config) setConfigMaxSpeed(config.maxSpeed);
+    if ('threshold' in config) setConfigThreshold(config.threshold);
+  }
 
-  // --- Render Logic ---
+  // Get appropriate icon based on device type
+  
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="">
+    <Modal isOpen={isOpen} onClose={onClose} title=""> {/* Title sẽ đặt trong content */}
       <div className="relative pb-2">
-        {/* --- Nút Close --- */}
-        <button
-            onClick={onClose}
-            disabled={isLoading}
-            className="absolute -top-2 -right-2 p-1 rounded-full text-gray-400 bg-gray-100 hover:bg-gray-200 hover:text-gray-600 transition duration-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            aria-label="Close modal"
-        >
-            <X size={18} />
-        </button>
+        {/* Close button */}
+        <button onClick={onClose} disabled={isLoading} className={styles.closeButton} aria-label="Close modal"> <X size={18}/> </button>
 
-        {/* --- Header --- */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-indigo-100 mb-4">
-              <Server size={24} className="text-indigo-600" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-800" id="modal-title">
-              {isEditing ? "Edit Device" : "Add New Device"}
-          </h3>
-          <p className="text-sm text-gray-500 mt-1">
-              {isEditing ? "Update the device configuration and credentials." : "Configure a new IoT device and link it to Adafruit IO."}
+        {/* Header */}
+        <div className={styles.header}> {/* Sử dụng class từ SCSS */}
+          <div className={styles.headerIconWrapper}> <Server size={24} className={styles.headerIcon}/> </div>
+          <h3 className={styles.headerTitle}> {isEditing ? "Edit Device" : "Add New Device"} </h3>
+          <p className={styles.headerSubtitle}>
+            {isEditing ? "Update device configuration" : "Configure a new IoT device"}
           </p>
         </div>
 
-        {/* --- Hiển thị lỗi chung --- */}
-        {error && (
-            <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 rounded-md flex items-start">
-                <AlertCircle size={18} className="text-red-500 mt-0.5 mr-2 flex-shrink-0" />
-                <p className="text-sm text-red-700 break-words">{error}</p>
-            </div>
-        )}
+        {/* Error display */}
+        {error && ( <div className={styles.errorBox}> <AlertCircle size={18}/> <p>{error}</p> </div> )}
 
         {/* --- Form --- */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className={styles.form}>
+          {/* Feed Name */}
+          <div className={commonStyles.formGroup}>
+            <label htmlFor="feed" className={commonStyles.label}>Feed Name <span className={commonStyles.required}>*</span></label>
+            <input type="text" id="feed" value={feed} onChange={(e) => setFeed(e.target.value)} required className={commonStyles.inputField} placeholder="e.g., living_room_light" disabled={isLoading} />
+            <small className={commonStyles.helpText}>Tên Feed bạn đã tạo trên Adafruit IO.</small>
+          </div>
 
-          {/* --- HƯỚNG DẪN ADAFRUIT IO (Chỉ khi thêm mới) --- */}
-          {/* (Giữ nguyên phần hướng dẫn) */}
-          {!isEditing && (
-                <div className="mb-5 p-3 bg-blue-50 border-l-4 border-blue-500 rounded-md text-sm text-blue-800">
-                    <h4 className="font-semibold mb-1.5 flex items-center">
-                         <Info size={16} className="mr-1.5" /> Important Steps:
-                     </h4>
-                     <ol className="list-decimal list-inside space-y-1">
-                         <li>Visit <a href="https://io.adafruit.com/" target="_blank" rel="noopener noreferrer" className="underline font-medium hover:text-blue-600">Adafruit IO <ExternalLink size={12} className="inline mb-0.5"/></a> and log in or create an account.</li>
-                         <li>Go to <strong className="font-medium">Feeds</strong> and create a <strong className="font-medium">New Feed</strong>. Note down the exact <strong className="font-medium">Feed Key</strong> (usually similar to the name, e.g., <code className="text-xs bg-blue-100 px-1 py-0.5 rounded">my-light</code>).</li>
-                         <li>Click on <strong className="font-medium">My Key</strong> (top right) to find your <strong className="font-medium">Adafruit Username</strong> and active <strong className="font-medium">AIO Key</strong>.</li>
-                         <li>Enter the <strong className="font-medium">Feed Key</strong>, <strong className="font-medium">Username</strong>, and <strong className="font-medium">AIO Key</strong> in the fields below.</li>
-                     </ol>
-                 </div>
-             )}
+          {/* Device Category Selection */}
+          <div className={commonStyles.formGroup}>
+            <label htmlFor="deviceCategory" className={commonStyles.label}>Device Type <span className={commonStyles.required}>*</span></label>
+            <div className="relative"> {/* Wrapper cho icon */}
+                <select id="deviceCategory" value={deviceCategory}
+                    onChange={(e) => {
+                        setDeviceCategory(e.target.value as DeviceCategory);
+                        // Reset các trường config liên quan khi đổi loại
+                        setDeviceConfigValue({});
+                        setConfigMin(''); setConfigMax(''); setConfigMinSpeed(''); setConfigMaxSpeed(''); setConfigThreshold('');
+                    }}
+                    className={`${commonStyles.selectField} pl-10`} // Thêm padding trái cho icon
+                    disabled={isLoading || isEditing} // Không cho sửa type khi edit
+                >
+                    <option value="LIGHT_SENSOR">Light Sensor</option>
+                    <option value="TEMP_SENSOR">Temperature Sensor</option>
+                    <option value="LIGHT_ACTUATOR">Light Actuator</option>
+                    <option value="TEMP_ACTUATOR">Temp Actuator</option>
+                </select>
+                 <div className={styles.selectIcon}> {getCategoryIcon(deviceCategory)} </div>
+                 <div className={styles.selectChevron}> <ChevronDown size={16} /> </div>
+            </div>
+             {isEditing && <small className={commonStyles.helpText}>Device type cannot be changed after creation.</small>}
+          </div>
 
-          {/* === Feed Name === */}
-          {/* (Giữ nguyên Feed Name) */}
-           <div>
-                 <label htmlFor="feed" className={`block text-sm font-medium mb-1 ${activeField === 'feed' ? 'text-indigo-600' : 'text-gray-700'}`}>
-                     Feed Key <span className="text-red-500">*</span>
-                 </label>
-                 <div className="relative">
-                     <input
-                         type="text"
-                         id="feed"
-                         value={feed}
-                         onChange={(e) => { setFeed(e.target.value); if (formTouched) setError(null); }}
-                         onFocus={() => handleFocus('feed')}
-                         onBlur={handleBlur}
-                         required
-                         className={`block w-full px-3 py-2.5 border rounded-lg shadow-sm focus:outline-none text-gray-900 sm:text-sm ${activeField === 'feed' ? 'border-indigo-500 ring-1 ring-indigo-500' : formTouched && !feed.trim() ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' } transition-all duration-200`}
-                         placeholder="e.g., living-room-light"
-                         disabled={isLoading}
-                     />
-                     {formTouched && !feed.trim() && <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"><AlertCircle size={16} className="text-red-500" /></div>}
-                 </div>
-                 {formTouched && !feed.trim() && <p className="mt-1 text-xs text-red-600">Feed key is required.</p>}
-                 <p className="mt-1 text-xs text-gray-500">Must exactly match the Feed Key created on Adafruit IO.</p>
-             </div>
-
-          {/* === THAY ĐỔI: Grid cho Category, Type, State === */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-
-              {/* --- Device Category (isSensor) --- */}
-              <div>
-                  <label htmlFor="isSensor" className={`block text-sm font-medium mb-1 ${activeField === 'isSensor' ? 'text-indigo-600' : 'text-gray-700'}`}>
-                      Device Category <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                      <select
-                          id="isSensor"
-                          value={isSensor ? 'true' : 'false'}
-                          onChange={(e) => { setIsSensor(e.target.value === 'true'); setFormTouched(false); setError(null); }} // Reset touch/error khi đổi
-                          onFocus={() => handleFocus('isSensor')}
-                          onBlur={handleBlur}
-                          required
-                          // --- THAY ĐỔI: Sử dụng class Tailwind và disable khi edit ---
-                          className={`block w-full pl-3 pr-10 py-2.5 border rounded-lg shadow-sm appearance-none text-gray-900 sm:text-sm focus:outline-none ${activeField === 'isSensor' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'} transition-all duration-200 ${isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                          disabled={isLoading || isEditing} // Disable khi loading hoặc đang edit
-                      >
-                          <option value="true">Sensor (Reads data)</option>
-                          <option value="false">Device (Controls state)</option>
-                      </select>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"><ChevronDown size={16} className="text-gray-500" /></div>
-                  </div>
-                  {isEditing && <p className="mt-1 text-xs text-orange-600">Device category cannot be changed after creation.</p> }
-                  {!isEditing && <p className="mt-1 text-xs text-gray-500">{isSensor ? 'Reports measurements' : 'Can be turned ON/OFF'}</p>}
+          {/* --- Conditional Config Section --- */}
+          <div className={styles.configSection}>
+              <h4 className={styles.configTitle}>Configuration (Optional)</h4>
+              <div className={styles.configGrid}>
+                  {/* Config cho Sensors */}
+                  {(deviceCategory === 'LIGHT_SENSOR' || deviceCategory === 'TEMP_SENSOR') && (
+                      <>
+                          <div className={commonStyles.formGroup}>
+                              <label htmlFor="configMin" className={commonStyles.label}>Min Value</label>
+                              <input type="number" id="configMin" name="min" value={configMin} onChange={(e)=>setConfigMin(e.target.value)} className={commonStyles.inputField} placeholder="e.g., 0 or 10" disabled={isLoading}/>
+                          </div>
+                          <div className={commonStyles.formGroup}>
+                              <label htmlFor="configMax" className={commonStyles.label}>Max Value</label>
+                              <input type="number" id="configMax" name="max" value={configMax} onChange={(e)=>setConfigMax(e.target.value)} className={commonStyles.inputField} placeholder="e.g., 1000 or 50" disabled={isLoading}/>
+                          </div>
+                      </>
+                  )}
+                  {/* Config cho Temp Actuator */}
+                  {deviceCategory === 'TEMP_ACTUATOR' && (
+                      <>
+                          <div className={commonStyles.formGroup}>
+                              <label htmlFor="configMinSpeed" className={commonStyles.label}>Min Speed (%)</label>
+                              <input type="number" id="configMinSpeed" name="minSpeed" value={configMinSpeed} onChange={(e)=>setConfigMinSpeed(e.target.value)} className={commonStyles.inputField} placeholder="e.g., 0" disabled={isLoading}/>
+                          </div>
+                          <div className={commonStyles.formGroup}>
+                              <label htmlFor="configMaxSpeed" className={commonStyles.label}>Max Speed (%)</label>
+                              <input type="number" id="configMaxSpeed" name="maxSpeed" value={configMaxSpeed} onChange={(e)=>setConfigMaxSpeed(e.target.value)} className={commonStyles.inputField} placeholder="e.g., 100" disabled={isLoading}/>
+                          </div>
+                          <div className={commonStyles.formGroup}>
+                              <label htmlFor="configThreshold" className={commonStyles.label}>Threshold (°C)</label>
+                              <input type="number" id="configThreshold" name="threshold" value={configThreshold} onChange={(e)=>setConfigThreshold(e.target.value)} className={commonStyles.inputField} placeholder="e.g., 28" disabled={isLoading}/>
+                          </div>
+                      </>
+                  )}
+                   {/* Config Initial State cho Actuators */}
+                   {(deviceCategory === 'LIGHT_ACTUATOR' || deviceCategory === 'TEMP_ACTUATOR') && (
+                       <div className={commonStyles.formGroup}>
+                           <label htmlFor="configInitialState" className={commonStyles.label}>Initial State</label>
+                           <select id="configInitialState" name="initialState" value={configInitialState} onChange={(e)=>setConfigInitialState(e.target.value as 'ON'|'OFF')} className={commonStyles.selectField} disabled={isLoading || isEditing} /* Không cho sửa state ban đầu khi edit */ >
+                               <option value="OFF">OFF</option>
+                               <option value="ON">ON</option>
+                           </select>
+                            {isEditing && <small className={commonStyles.helpText}>Initial state applies when adding. Current state is managed via controls.</small>}
+                       </div>
+                   )}
+                   {(deviceCategory !== 'LIGHT_SENSOR' && deviceCategory !== 'TEMP_SENSOR' && deviceCategory !== 'TEMP_ACTUATOR') && (
+                        <p className={styles.noConfigText}>No specific configuration for this device type.</p>
+                   )}
               </div>
+          </div>
 
 
-              {/* --- Device Type (Temp/Light) --- */}
-              <div>
-                  <label htmlFor="type" className={`block text-sm font-medium mb-1 ${activeField === 'type' ? 'text-indigo-600' : 'text-gray-700'}`}>
-                      Measurement/Control Type
-                      <span className="ml-1 inline-flex items-center" title={ isSensor ? "What does this sensor measure?" : "What does this device control?"}>
-                           <HelpCircle size={14} className="text-gray-400 hover:text-indigo-500 cursor-help transition-colors" />
-                      </span>
-                    </label>
-                  <div className="relative">
-                      <select
-                          id="type"
-                          value={type}
-                          onChange={(e) => { setType(e.target.value as 'TEMP' | 'LIGHT'); setFormTouched(false); setError(null); }}
-                          onFocus={() => handleFocus('type')}
-                          onBlur={handleBlur}
-                          className={`block w-full pl-10 pr-10 py-2.5 border rounded-lg shadow-sm appearance-none text-gray-900 sm:text-sm focus:outline-none ${activeField === 'type' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'} transition-all duration-200 ${isEditing ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                          disabled={isLoading || isEditing} // Disable nếu đang edit
-                      >
-                          <option value="TEMP">Temperature</option>
-                          <option value="LIGHT">Light</option>
-                      </select>
-                      <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">{getTypeIcon(type)}</div>
-                      <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"><ChevronDown size={16} className="text-gray-500" /></div>
-                  </div>
-                   {isEditing && <p className="mt-1 text-xs text-orange-600">Measurement/Control type cannot be changed.</p> }
-                   {!isEditing && <p className="mt-1 text-xs text-gray-500">{type === 'TEMP' ? (isSensor ? 'Monitors temperature' : 'Controls temperature system') : (isSensor ? 'Monitors light level' : 'Controls a light')}</p>}
+          {/* --- Credentials Section --- */}
+          <div className={styles.credentialsSection}>
+            <div className={styles.sectionDivider}><span>Adafruit IO Credentials</span></div>
+            {/* Adafruit Username */}
+            <div className={commonStyles.formGroup}>
+              <label htmlFor="adaUsername" className={commonStyles.label}>Username <span className={commonStyles.required}>*</span></label>
+              <input type="text" id="adaUsername" value={adaUsername} onChange={(e) => setAdaUsername(e.target.value)} required className={commonStyles.inputField} placeholder={defaultAdaUsername || "Your Adafruit Username"} disabled={isLoading} />
+            </div>
+            {/* Adafruit API Key */}
+            <div className={commonStyles.formGroup}>
+               <label htmlFor="adaApiKey" className={commonStyles.label}>IO Key {mode === 'add' ? <span className={commonStyles.required}>*</span> : '(Leave blank to keep current)'}</label>
+              <div className="relative">
+                <input type={showPassword ? "text" : "password"} id="adaApiKey" value={adaApiKey} onChange={(e) => setAdaApiKey(e.target.value)} required={mode === 'add'} className={`${commonStyles.inputField} pr-10`} placeholder={isEditing ? "Enter new key to change" : "Your Adafruit IO Key"} disabled={isLoading} />
+                <button type="button" className={styles.passwordToggle} onClick={togglePasswordVisibility} aria-label={showPassword ? "Hide key" : "Show key"} tabIndex={-1} > {showPassword ? <EyeOff size={16} /> : <Eye size={16} />} </button>
               </div>
+            </div>
+          </div>
 
-
-              {/* --- State (ON/OFF) - THAY ĐỔI: Chỉ hiện khi là Device --- */}
-              {!isSensor && (
-                  <div>
-                      <label htmlFor="state" className={`block text-sm font-medium mb-1 ${activeField === 'state' ? 'text-indigo-600' : 'text-gray-700'}`}>Initial State</label>
-                      <div className="relative">
-                          <select
-                              id="state"
-                              value={state}
-                              onChange={(e) => { setState(e.target.value as 'ON' | 'OFF'); if (formTouched) setError(null);}}
-                              onFocus={() => handleFocus('state')}
-                              onBlur={handleBlur}
-                              className={`block w-full pl-3 pr-10 py-2.5 border rounded-lg shadow-sm appearance-none text-gray-900 sm:text-sm focus:outline-none ${activeField === 'state' ? 'border-indigo-500 ring-1 ring-indigo-500' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500'} transition-all duration-200`}
-                              disabled={isLoading}
-                          >
-                              <option value="OFF">OFF</option>
-                              <option value="ON">ON</option>
-                          </select>
-                          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"><ChevronDown size={16} className="text-gray-500" /></div>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">{state === 'ON' ? 'Device will start in ON state' : 'Device will start in OFF state'}</p>
-                  </div>
+          {/* --- Action Buttons --- */}
+          <div className={styles.footerButtonGroup}>
+              {/* Nút Delete chỉ hiện khi Edit */}
+              {isEditing && onDelete && (
+                  <button type="button" onClick={handleDelete} disabled={isLoading} className={`${commonStyles.button} ${commonStyles.dangerButton} mr-auto`} > {/* Đẩy nút Delete sang trái */}
+                      <Trash2 size={16} /> Delete
+                  </button>
               )}
-              {/* ----------------------------------------------------- */}
-
-          </div> {/* Kết thúc grid */}
-
-
-          {/* === Device Configuration Section === */}
-          {/* (Giữ nguyên logic hiển thị config dựa trên type, nhưng chỉ hiển thị nếu là TEMP Sensor hoặc là Device) */}
-           <div className="pt-4 mt-4 border-t border-gray-200">
-                 <h4 className="text-sm font-medium text-gray-500 mb-3">Device Configuration (Optional)</h4>
-
-                 {/* Chỉ hiển thị config khi là Sensor Nhiệt độ HOẶC là Device (Bất kể Type) */}
-                 {(isSensor && type === 'TEMP') || !isSensor ? (
-                     <>
-                         {/* Config for TEMP (Hiển thị nếu Type là TEMP) */}
-                         {type === 'TEMP' && (
-                             <div className="space-y-3 mb-3"> {/* Thêm mb-3 nếu có config LIGHT bên dưới */}
-                                 {/* Min Temp Input */}
-                                 <div>
-                                     <label htmlFor="minTemp" className={`block text-sm font-medium mb-1 ${activeField === 'minTemp' ? 'text-indigo-600' : 'text-gray-700'}`}>Min Temperature (°C)</label>
-                                     <input
-                                         type="number" step="any" id="minTemp" name="minTemp"
-                                         value={minTemp}
-                                         onChange={(e) => { setMinTemp(e.target.value); if (formTouched) validateAndBuildConfig(); setError(null); }}
-                                         onBlur={handleBlur} onFocus={() => handleFocus('minTemp')}
-                                         className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm ${configErrors.minTemp ? 'border-red-500 ring-1 ring-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'}`}
-                                         placeholder="e.g., 0" disabled={isLoading}
-                                     />
-                                     {configErrors.minTemp && <p className="mt-1 text-xs text-red-600">{configErrors.minTemp}</p>}
-                                 </div>
-                                 {/* Max Temp Input */}
-                                  <div>
-                                     <label htmlFor="maxTemp" className={`block text-sm font-medium mb-1 ${activeField === 'maxTemp' ? 'text-indigo-600' : 'text-gray-700'}`}>Max Temperature (°C)</label>
-                                     <input
-                                         type="number" step="any" id="maxTemp" name="maxTemp"
-                                         value={maxTemp}
-                                         onChange={(e) => { setMaxTemp(e.target.value); if (formTouched) validateAndBuildConfig(); setError(null); }}
-                                         onBlur={handleBlur} onFocus={() => handleFocus('maxTemp')}
-                                         className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm ${configErrors.maxTemp ? 'border-red-500 ring-1 ring-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'}`}
-                                         placeholder="e.g., 40" disabled={isLoading}
-                                     />
-                                     {configErrors.maxTemp && <p className="mt-1 text-xs text-red-600">{configErrors.maxTemp}</p>}
-                                 </div>
-                             </div>
-                         )}
-
-                         {/* Config for LIGHT (Hiển thị nếu Type là LIGHT VÀ LÀ DEVICE) */}
-                         {type === 'LIGHT' && !isSensor && (
-                             <div>
-                                 <label htmlFor="lightThreshold" className={`block text-sm font-medium mb-1 ${activeField === 'lightThreshold' ? 'text-indigo-600' : 'text-gray-700'}`}>Light Threshold</label>
-                                 <input
-                                     type="number" step="any" id="lightThreshold" name="lightThreshold"
-                                     value={lightThreshold}
-                                     onChange={(e) => { setLightThreshold(e.target.value); if (formTouched) validateAndBuildConfig(); setError(null); }}
-                                     onBlur={handleBlur} onFocus={() => handleFocus('lightThreshold')}
-                                     className={`mt-1 block w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none sm:text-sm ${configErrors.lightThreshold ? 'border-red-500 ring-1 ring-red-500 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-indigo-500 focus:border-indigo-500'}`}
-                                     placeholder="e.g., 50 (unit depends on sensor)" disabled={isLoading}
-                                 />
-                                 {configErrors.lightThreshold && <p className="mt-1 text-xs text-red-600">{configErrors.lightThreshold}</p>}
-                                  <p className="mt-1 text-xs text-gray-500">Define a threshold value for light-based automation (if applicable).</p>
-                             </div>
-                         )}
-                     </>
-                 ) : (
-                     /* Fallback nếu là Sensor mà không phải TEMP */
-                     isSensor && type !== 'TEMP' && (
-                        <p className="text-sm text-gray-500 italic">No specific configuration available for this sensor type.</p>
-                     )
-                 )}
-             </div>
-
-
-          {/* === Adafruit IO Credentials Section === */}
-          {/* (Giữ nguyên) */}
-           <div className="pt-5 mt-5 border-t border-gray-200">
-                 <div className="flex items-center mb-4">
-                     <div className="flex-grow border-t border-gray-200"></div>
-                     <span className="flex-shrink-0 px-3 text-sm font-medium text-gray-500">Adafruit IO Credentials</span>
-                     <div className="flex-grow border-t border-gray-200"></div>
-                 </div>
-                 {/* Username */}
-                 <div className="mb-4">
-                      <label htmlFor="adaUsername" className={`block text-sm font-medium mb-1 ${activeField === 'adaUsername' ? 'text-indigo-600' : 'text-gray-700'}`}>
-                          Adafruit Username <span className="text-red-500">*</span>
-                         <span className="ml-1 inline-flex items-center" title="Your Adafruit IO username">
-                              <Info size={14} className="text-gray-400 hover:text-indigo-500 cursor-help transition-colors" />
-                         </span>
-                      </label>
-                     <div className="relative">
-                         <input
-                             type="text" id="adaUsername" value={adaUsername}
-                             onChange={(e) => { setAdaUsername(e.target.value); if (formTouched) setError(null);}}
-                             onFocus={() => handleFocus('adaUsername')} onBlur={handleBlur} required
-                             className={`block w-full px-3 py-2.5 border rounded-lg shadow-sm focus:outline-none text-gray-900 sm:text-sm ${activeField === 'adaUsername' ? 'border-indigo-500 ring-1 ring-indigo-500' : formTouched && !adaUsername.trim() ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' } transition-all duration-200`}
-                             placeholder="Your Adafruit Username" disabled={isLoading}
-                         />
-                         {formTouched && !adaUsername.trim() && <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none"><AlertCircle size={16} className="text-red-500" /></div>}
-                     </div>
-                     {formTouched && !adaUsername.trim() && <p className="mt-1 text-xs text-red-600">Adafruit username is required.</p>}
-                 </div>
-                 {/* API Key */}
-                  <div>
-                      <label htmlFor="adaApiKey" className={`block text-sm font-medium mb-1 ${activeField === 'adaApiKey' ? 'text-indigo-600' : 'text-gray-700'}`}>
-                          Adafruit IO Key <span className="text-red-500">*</span>
-                         <span className="ml-1 inline-flex items-center" title="Your Adafruit IO API Key (AIO Key)">
-                              <Info size={14} className="text-gray-400 hover:text-indigo-500 cursor-help transition-colors" />
-                         </span>
-                      </label>
-                     <div className="relative">
-                         <input
-                             type={showPassword ? "text" : "password"} id="adaApiKey" value={adaApiKey}
-                             onChange={(e) => { setAdaApiKey(e.target.value); if (formTouched) setError(null);}}
-                             onFocus={() => handleFocus('adaApiKey')} onBlur={handleBlur} required
-                             className={`block w-full px-3 py-2.5 border rounded-lg shadow-sm focus:outline-none text-gray-900 sm:text-sm pr-10 ${activeField === 'adaApiKey' ? 'border-indigo-500 ring-1 ring-indigo-500' : formTouched && !adaApiKey.trim() ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-indigo-500 focus:ring-indigo-500' } transition-all duration-200`}
-                             placeholder="Your Adafruit IO Key" disabled={isLoading} autoComplete="new-password"
-                         />
-                         <button type="button" className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-indigo-600 transition-colors focus:outline-none" onClick={togglePasswordVisibility} aria-label={showPassword ? "Hide API Key" : "Show API Key"} tabIndex={-1}>
-                             {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                         </button>
-                         {formTouched && !adaApiKey.trim() && <div className="absolute inset-y-0 right-10 flex items-center pr-1 pointer-events-none"><AlertCircle size={16} className="text-red-500" /></div>}
-                     </div>
-                     {formTouched && !adaApiKey.trim() && <p className="mt-1 text-xs text-red-600">Adafruit API Key is required.</p>}
-                 </div>
-             </div>
-
-          {/* === Action Buttons === */}
-          {/* (Giữ nguyên) */}
-            <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-4 space-y-3 space-y-reverse sm:space-y-0 pt-6">
-                 <button
-                     type="button" onClick={onClose} disabled={isLoading}
-                     className="w-full sm:w-auto px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors duration-200 disabled:opacity-50"
-                 >
-                     Cancel
-                 </button>
-                 <button
-                     type="submit" disabled={isLoading}
-                     className="w-full sm:w-auto inline-flex justify-center items-center px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 border border-transparent rounded-lg shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-70 transition-colors duration-200"
-                 >
-                     {isLoading ? ( /* Spinner SVG */ <>...</> ) : ( <> <Save size={16} className="-ml-0.5 mr-2" /> {isEditing ? 'Save Changes' : 'Add Device'} </> )}
-                 </button>
-             </div>
-
+              {/* Nút Cancel và Save */}
+              <button type="button" onClick={onClose} disabled={isLoading} className={`${commonStyles.button} ${commonStyles.secondaryButton}`} > <X size={16} /> Cancel </button>
+              <button type="submit" disabled={isLoading} className={`${commonStyles.button} ${commonStyles.primaryButton}`} >
+                  {isLoading ? ( <svg className="animate-spin h-4 w-4 mr-2" /* ... */ ></svg> ) : ( <Save size={16} className="mr-1" /> )}
+                  {isLoading ? (isEditing ? 'Saving...' : 'Creating...') : (isEditing ? 'Save Changes' : 'Add Device')}
+              </button>
+          </div>
         </form>
       </div>
     </Modal>
   );
 };
 
-export default AddEditDeviceModal;
+
+// Có thể không cần EnhancedAddEditDeviceModal nếu không dùng phím tắt phức tạp
+export default AddEditDeviceModal; // Xuất component chính
+
+

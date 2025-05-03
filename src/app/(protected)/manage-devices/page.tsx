@@ -1,8 +1,8 @@
 // app/(protected)/manage-devices/page.tsx
 "use client";
-
+import axios from 'axios';
 import React, { useState, useEffect, useCallback } from 'react';
-// Icons
+// Icons: Thêm Loader2, Filter, Search, DownloadCloud
 import { Plus, Edit, Trash2, RefreshCw, ChevronLeft, ChevronRight, Loader2, Filter, Search, DownloadCloud } from 'lucide-react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
@@ -10,9 +10,10 @@ import 'react-toastify/dist/ReactToastify.css';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import apiClient from '@/lib/apiClient';
-import { Device, ApiResponse } from '@/lib/types';
-// Components
-import AddEditDeviceModal from '@/components/management/AddEditDeviceModal'; // Đã cập nhật ở bước trước
+import { Device, DeviceDTO, ApiResponse } from '@/lib/types';
+// Giả sử các component này nằm trong thư mục components/Management
+import AddEditDeviceModal from '@/components/management/AddEditDeviceModal';
+
 import DeleteConfirmationModal from '@/components/management/DeleteConfirmationModal';
 
 // --- Helper Functions ---
@@ -21,7 +22,7 @@ const getDefaultAdaCredentials = () => ({
   apiKey: process.env.NEXT_PUBLIC_ADA_API_KEY || '',
 });
 
-// Định nghĩa styles (Giữ nguyên)
+// Định nghĩa các loại thiết bị và trạng thái với các màu sắc tương ứng (Thêm icon và hỗ trợ nhiều loại hơn)
 const deviceTypeStyles: { [key: string]: { bgColor: string; textColor: string; icon: string } } = {
   'TEMP': { bgColor: 'bg-blue-100', textColor: 'text-blue-800', icon: '🌡️' },
   'HUMID': { bgColor: 'bg-cyan-100', textColor: 'text-cyan-800', icon: '💧' },
@@ -33,9 +34,9 @@ const deviceTypeStyles: { [key: string]: { bgColor: string; textColor: string; i
 };
 
 const deviceStateStyles: { [key: string]: { bgColor: string; textColor: string; pulseClass: string; icon: string } } = {
-  'ON': { bgColor: 'bg-green-100', textColor: 'text-green-800', pulseClass: 'animate-pulse', icon: '🟢' },
-  'OFF': { bgColor: 'bg-red-100', textColor: 'text-red-800', pulseClass: '', icon: '🔴' },
-  'default': { bgColor: 'bg-gray-100', textColor: 'text-gray-800', pulseClass: '', icon: '⚪' },
+  'ON': { bgColor: 'bg-green-100', textColor: 'text-green-800', pulseClass: 'animate-pulse', icon: '🟢' }, // Icon sáng
+  'OFF': { bgColor: 'bg-red-100', textColor: 'text-red-800', pulseClass: '', icon: '🔴' }, // Icon tối
+  'default': { bgColor: 'bg-gray-100', textColor: 'text-gray-800', pulseClass: '', icon: '⚪' }, // Icon mặc định
 };
 
 
@@ -43,7 +44,7 @@ export default function ManageDevicesPage() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null); // Lỗi fetch danh sách
+  const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // State cho Modals
@@ -53,32 +54,30 @@ export default function ManageDevicesPage() {
   const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Pagination State
+
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Filter & Search State
+
   const [searchTerm, setSearchTerm] = useState('');
-  // const [filterType, setFilterType] = useState<string>(''); // <<< XÓA BỘ LỌC TYPE
-  const [filterState, setFilterState] = useState<string>(''); // Giữ lại lọc state
+  const [filterType, setFilterType] = useState<string>('');
+  const [filterState, setFilterState] = useState<string>('');
 
   const { username: defaultAdaUsername, apiKey: defaultAdaApiKey } = getDefaultAdaCredentials();
 
-  // --- Data Fetching ---
-  const fetchDevices = useCallback(async (showToast = false) => {
+  
+  const fetchDevices = useCallback(async (showToast = false) => { // Thêm tham số để kiểm soát toast khi refresh
     setIsLoading(true);
-    setError(null); // Reset lỗi trước khi fetch
+    setError(null);
     console.log("Fetching devices...");
     try {
       const response = await apiClient.get<ApiResponse<Device[]>>('/devices');
       if (response.data?.data) {
-        console.log("Devices fetched:", response.data.data.length);
-        const fetchedDevices = response.data.data;
-        setDevices(fetchedDevices);
-        // Áp dụng bộ lọc hiện tại ngay sau khi fetch
-        // <<< Bỏ filterType khỏi đây
-        applyFiltersAndSearch(fetchedDevices, searchTerm, filterState);
+        console.log("Devices fetched:", response.data.data);
+        setDevices(response.data.data);
+        // Gọi hàm applyFiltersAndSearch ở đây để đảm bảo state devices đã cập nhật
+        applyFiltersAndSearch(response.data.data, searchTerm, filterType, filterState);
         if (showToast) {
           toast.info("Device list refreshed!");
         }
@@ -86,34 +85,31 @@ export default function ManageDevicesPage() {
         console.warn("No data received from /devices endpoint");
         setDevices([]);
         setFilteredDevices([]);
+        // Không cần apply filter nữa vì không có data
       }
     } catch (err: unknown) {
       console.error('Error fetching devices:', err);
-      // Cố gắng lấy lỗi cụ thể từ response backend nếu có
-      const errorMessage = (err as { response?: { data?: { message?: string, errorMessage?: string } } })?.response?.data?.errorMessage
-                         || (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-                         || (err instanceof Error ? err.message : "Unknown error occurred.");
-      setError(`Failed to load devices: ${errorMessage}`); // Hiển thị lỗi fetch
+      const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || (err instanceof Error ? err.message : "Unknown error occurred.");
+      setError(`Failed to load devices: ${errorMessage}`);
       setDevices([]);
       setFilteredDevices([]);
-      // Không cần toast lỗi ở đây vì đã có component hiển thị lỗi `error` state
+      toast.error(`Failed to load devices: ${errorMessage}`);
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
+      setIsRefreshing(false); // Luôn tắt cờ refresh ở đây
     }
-  // <<< Bỏ filterType khỏi dependencies
-  }, [searchTerm, filterState]); // Chỉ phụ thuộc vào search và state filter
+  
+  }, [searchTerm, filterType, filterState]); // Thêm dependencies cho useCallback
 
-  // Fetch data lần đầu
+  // Fetch data lần đầu khi component mount
   useEffect(() => {
     fetchDevices();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Chỉ chạy 1 lần khi mount
+  }, []); // Chỉ chạy 1 lần
 
-  // --- Filtering & Searching ---
-  // <<< Bỏ tham số type
-  const applyFiltersAndSearch = useCallback((baseDevices: Device[], search: string, state: string) => {
-    console.log(`Applying filters: Search='${search}', State='${state}'`);
+  // Áp dụng bộ lọc và tìm kiếm (Client-side)
+  const applyFiltersAndSearch = useCallback((baseDevices: Device[], search: string, type: string, state: string) => {
     let result = [...baseDevices];
 
     // Áp dụng tìm kiếm (ID, Feed, Username)
@@ -126,160 +122,209 @@ export default function ManageDevicesPage() {
       );
     }
 
-    // <<< Bỏ logic lọc theo type
-    // if (type) {
-    //   result = result.filter(device => device.type === type);
-    // }
+    // Áp dụng lọc theo loại thiết bị
+    if (type) {
+      result = result.filter(device => device.type === type);
+    }
 
     // Áp dụng lọc theo trạng thái
     if (state) {
       result = result.filter(device => device.state === state);
     }
 
-    console.log("Filtered devices count:", result.length);
     setFilteredDevices(result);
-
-    // Tính toán lại totalPages và reset trang nếu cần
-    const newTotalPages = Math.max(1, Math.ceil(result.length / itemsPerPage));
-    setTotalPages(newTotalPages);
-    if (currentPage > newTotalPages) {
-      setCurrentPage(1); // Reset về trang 1 nếu trang hiện tại không còn hợp lệ
+    setTotalPages(Math.max(1, Math.ceil(result.length / itemsPerPage)));
+    // Chỉ reset về trang 1 nếu trang hiện tại lớn hơn tổng số trang mới
+    if (currentPage > Math.max(1, Math.ceil(result.length / itemsPerPage))) {
+        setCurrentPage(1);
     }
-  // Phụ thuộc vào itemsPerPage và currentPage để tính toán lại đúng khi chúng thay đổi
-  }, [itemsPerPage, currentPage]);
+  }, [itemsPerPage, currentPage]); // Thêm currentPage vào dependencies
 
-  // Chạy lại bộ lọc khi dữ liệu gốc hoặc các điều kiện lọc (search, state) thay đổi
-  // <<< Bỏ filterType
+  // Chạy lại bộ lọc khi dữ liệu gốc hoặc các điều kiện lọc thay đổi
   useEffect(() => {
-    // Gọi applyFiltersAndSearch với các state hiện tại
-    applyFiltersAndSearch(devices, searchTerm, filterState);
-  }, [devices, searchTerm, filterState, applyFiltersAndSearch]); // Phụ thuộc vào các state lọc và hàm lọc
+    applyFiltersAndSearch(devices, searchTerm, filterType, filterState);
+  }, [devices, searchTerm, filterType, filterState, applyFiltersAndSearch]);
 
-  // Chạy lại tính toán totalPages khi itemsPerPage hoặc số lượng filteredDevices thay đổi
+  // Chạy lại tính toán totalPages khi itemsPerPage thay đổi
   useEffect(() => {
-      const newTotalPages = Math.max(1, Math.ceil(filteredDevices.length / itemsPerPage));
-      setTotalPages(newTotalPages);
+      setTotalPages(Math.max(1, Math.ceil(filteredDevices.length / itemsPerPage)));
       // Đảm bảo trang hiện tại không vượt quá tổng số trang mới
-      if (currentPage > newTotalPages) {
-          setCurrentPage(newTotalPages); // Đặt về trang cuối cùng hợp lệ
-      } else if (currentPage < 1 && newTotalPages >= 1) {
-          setCurrentPage(1); // Đảm bảo không nhỏ hơn 1
+      if (currentPage > Math.max(1, Math.ceil(filteredDevices.length / itemsPerPage))) {
+          setCurrentPage(Math.max(1, Math.ceil(filteredDevices.length / itemsPerPage)));
       }
   }, [itemsPerPage, filteredDevices.length, currentPage]);
 
-  // --- Event Handlers ---
-
+  // Xử lý refresh dữ liệu
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchDevices(true); // Gọi fetch và hiển thị toast khi làm mới thủ công
+    await fetchDevices(true); // Gọi fetch và hiển thị toast
   };
 
-  // Handler xuất CSV (Giữ nguyên)
+  // Xử lý xuất dữ liệu thành CSV
   const handleExportCSV = () => {
     if (filteredDevices.length === 0) {
       toast.warn("No devices to export.");
       return;
     }
     try {
-        const headers = ['ID', 'Feed', 'Type', 'State', 'Username', 'API Key', 'Config']; // Thêm cột Config
-        const csvData = filteredDevices.map(device => [
-            `"${device.id}"`,
-            `"${device.feed}"`,
-            `"${device.type}"`,
-            `"${device.state}"`,
-            `"${device.adaUsername || ''}"`,
-            `"${device.adaApikey || ''}"`,
-            `"${JSON.stringify(device.deviceConfig || {}).replace(/"/g, '""')}"` // Stringify JSON và escape dấu nháy kép
-        ]);
-        const csvContent = [headers.join(';'), ...csvData.map(row => row.join(';'))].join('\n');
-        const BOM = '\uFEFF';
-        const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', `devices_export_${new Date().toISOString().slice(0,10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        toast.success('Exported devices data successfully!');
+      // Tạo header cho CSV
+      const headers = ['ID', 'Feed', 'Type', 'State', 'Username', 'API Key']; // Thêm API Key nếu cần
+
+      // Tạo dữ liệu CSV từ filteredDevices
+      const csvData = filteredDevices.map(device => [
+        `"${device.id}"`, // Bọc trong dấu nháy kép để xử lý ID có thể chứa ký tự đặc biệt
+        `"${device.feed}"`,
+        `"${device.type}"`,
+        `"${device.state}"`,
+        `"${device.adaUsername || ''}"`,
+        `"${device.adaApikey || ''}"` // Thêm API Key
+      ]);
+
+      // Ghép header và dữ liệu
+      // Sử dụng dấu chấm phẩy (;) làm dấu phân cách nếu Excel ở một số vùng gặp vấn đề với dấu phẩy (,)
+      const csvContent = [headers.join(';'), ...csvData.map(row => row.join(';'))].join('\n');
+
+      // Tạo blob và link tải xuống (thêm BOM để hỗ trợ UTF-8 tốt hơn trong Excel)
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `devices_export_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url); // Giải phóng bộ nhớ
+
+      toast.success('Exported devices data successfully!');
     } catch (err) {
-        console.error('Export error:', err);
-        toast.error('Failed to export devices data.');
+      console.error('Export error:', err);
+      toast.error('Failed to export devices data.');
     }
   };
 
-  // Mở modal Add
+  // --- Event Handlers ---
   const handleAddClick = () => {
     setEditingDevice(null);
     setIsModalOpen(true);
   };
 
-  // Mở modal Edit
   const handleEditClick = (device: Device) => {
     setEditingDevice(device);
     setIsModalOpen(true);
   };
 
-  // Mở modal Delete
   const handleDeleteClick = (deviceId: string) => {
     setDeletingDeviceId(deviceId);
     setShowDeleteConfirm(true);
   };
 
-  // Đóng modal Add/Edit
   const handleModalClose = () => {
     setIsModalOpen(false);
-    setEditingDevice(null); // Reset editing state khi đóng
+    setEditingDevice(null);
   };
 
-  // Đóng modal Delete
   const handleDeleteModalClose = () => {
     setShowDeleteConfirm(false);
     setDeletingDeviceId(null);
   };
 
-  // <<< HÀM NÀY THAY THẾ handleModalSubmit CŨ >>>
-  // Được gọi từ AddEditDeviceModal khi thêm/sửa thành công
-  const handleModalSuccess = async () => {
-    const action = editingDevice ? 'updated' : 'added'; // Xác định hành động để hiển thị toast
-    handleModalClose(); // Đóng modal
-    await fetchDevices(); // Tải lại danh sách thiết bị
-    toast.success(`Device ${action} successfully!`); // Thông báo thành công chung
-  };
+  const handleModalSubmit = useCallback(async (deviceData: DeviceDTO /* Bỏ mode đi nếu AddEditModal không truyền về */) => {
+    // Xác định mode dựa trên state editingDevice
+    const mode = editingDevice ? 'edit' : 'add'; // <<< Xác định mode ở đây
+    
 
-  // <<< XÓA HÀM handleModalSubmit cũ ở đây >>>
-  // const handleModalSubmit = async (deviceData: DeviceDTO) => { ... }
+    console.log(`Saving device in mode: ${mode}`, deviceData);
+    // setIsLoading(true); // Modal nên tự quản lý loading
 
-  // Xác nhận xóa (Giữ nguyên)
+    try {
+        let response;
+        let successMessage = "";
+
+        if (mode === 'add') {
+            response = await apiClient.post<ApiResponse<Device>>("/devices", deviceData);
+            successMessage = response.data?.message || "Device added successfully!";
+            toast.success(successMessage);
+            handleModalClose(); // <<< Dùng hàm đóng modal của trang này
+            await fetchDevices(); // <<< Tải lại danh sách
+        } else if (mode === 'edit') {
+             // <<< Dùng editingDevice thay vì selectedDevice >>>
+             if (!editingDevice?.id) {
+                  throw new Error("Cannot update device: No device selected or missing ID.");
+             }
+
+             // Chỉ lấy các trường được phép cập nhật từ deviceData (dữ liệu từ form)
+             const putPayload: Partial<DeviceDTO> = {
+                 feed: deviceData.feed,
+                 adaUsername: deviceData.adaUsername,
+                 deviceConfig: deviceData.deviceConfig,
+                  // Chỉ gửi adaApikey nếu người dùng đã nhập giá trị MỚI vào form
+                 ...(deviceData.adaApikey && { adaApikey: deviceData.adaApikey }),
+             };
+
+             console.log("Payload for PUT:", putPayload);
+             // <<< Dùng editingDevice.id cho URL >>>
+             response = await apiClient.put<ApiResponse<unknown>>(`/devices/${editingDevice.id}`, putPayload);
+             successMessage = response.data?.message || "Device updated successfully!";
+             toast.success(successMessage);
+             handleModalClose(); // <<< Dùng hàm đóng modal của trang này
+             await fetchDevices(); // <<< Tải lại danh sách (thay vì gọi handleDeviceUpdate)
+         } else {
+             throw new Error("Invalid mode specified.");
+         }
+    } catch (err) { // Không cần kiểu 'any' hoặc 'unknown' tường minh ở đây
+        console.error(`Error ${mode}ing device:`, err);
+        let userErrorMessage = `Failed to ${mode} device.`;
+        // Sử dụng type guard của axios
+        if (axios.isAxiosError(err) && err.response) {
+            const responseData = err.response?.data as { message?: string; detail?: string }; // Define a specific type for response data
+            userErrorMessage = `${userErrorMessage} ${responseData?.message || responseData?.detail || err.message}`;
+        } else if (err instanceof Error) {
+            userErrorMessage = `${userErrorMessage} ${err.message}`;
+        }
+        toast.error(userErrorMessage);
+        // Không cần ném lỗi lại ở đây vì không có logic nào bên ngoài cần bắt nó nữa
+        // throw err;
+    } finally {
+       // setIsLoading(false); // Modal nên tự quản lý
+    }
+// Khai báo dependencies cho useCallback
+}, [editingDevice, handleModalClose, fetchDevices]); // <<< Dependencies cần thiết
+
+
+  // Xử lý xác nhận xóa
   const confirmDelete = async () => {
     if (!deletingDeviceId) return;
+
     setIsDeleting(true);
     try {
       const response = await apiClient.delete(`/devices/${deletingDeviceId}`);
       toast.success(response.data?.message || `Device deleted successfully!`);
       handleDeleteModalClose();
-      await fetchDevices(); // Fetch lại danh sách sau khi xóa
+      // Thay vì fetch lại toàn bộ, có thể cập nhật state local nhanh hơn
+      // setDevices(prev => prev.filter(d => d.id !== deletingDeviceId));
+      // Tuy nhiên, fetch lại đảm bảo dữ liệu nhất quán nếu có thay đổi khác từ server
+      await fetchDevices();
     } catch (err: unknown) {
       console.error('Error deleting device:', err);
-      const errorMessage = (err as { response?: { data?: { message?: string, errorMessage?: string } } })?.response?.data?.errorMessage
-                         || (err as { response?: { data?: { message?: string } } })?.response?.data?.message
-                         || (err instanceof Error ? err.message : "Unknown error occurred.");
+      const errorMessage = (err as { response?: { data?: { message?: string } } })?.response?.data?.message
+        || (err instanceof Error ? err.message : "Unknown error occurred.");
       toast.error(`Failed to delete device: ${errorMessage}`);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  // Lấy danh sách thiết bị cho trang hiện tại (Giữ nguyên)
+  // Lấy danh sách thiết bị hiện tại để hiển thị dựa trên trang hiện tại
   const getCurrentDevices = () => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return filteredDevices.slice(startIndex, endIndex);
   };
 
-  // Xử lý chuyển trang (Giữ nguyên)
+  // Xử lý phân trang
   const handlePageChange = (page: number) => {
+    // Đảm bảo trang nằm trong khoảng hợp lệ
     const newPage = Math.max(1, Math.min(page, totalPages));
     setCurrentPage(newPage);
   };
@@ -287,10 +332,11 @@ export default function ManageDevicesPage() {
 
   // --- Render Logic ---
   return (
+    // Gradient background và padding
     <div className="p-4 md:p-6 bg-gradient-to-br from-gray-50 to-blue-50 min-h-screen">
-      <ToastContainer position="bottom-right" autoClose={4000} theme="colored" newestOnTop />
+      <ToastContainer position="bottom-right" autoClose={3000} theme="colored" newestOnTop />
 
-      {/* Header */}
+      {/* Header with gradient text và animation */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -300,15 +346,14 @@ export default function ManageDevicesPage() {
         <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-blue-500">
           Quản lý Thiết bị IoT
         </h1>
-        <p className="text-gray-600 mt-2">Theo dõi và quản lý tất cả thiết bị IoT của bạn.</p>
+        <p className="text-gray-600 mt-2">Theo dõi và quản lý tất cả thiết bị IoT của bạn từ một nơi duy nhất.</p>
       </motion.div>
 
-      {/* Action Bar */}
+      {/* Action Bar: Thanh tìm kiếm, lọc, và các nút chức năng */}
       <div className="bg-white rounded-lg shadow-md p-4 mb-6">
         <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 md:space-x-4">
           {/* Phần tìm kiếm và lọc */}
           <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full md:w-auto flex-wrap">
-            {/* --- Search Input --- */}
             <div className="relative flex-grow sm:flex-grow-0">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" size={18} />
               <input
@@ -319,10 +364,8 @@ export default function ManageDevicesPage() {
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full sm:w-64"
               />
             </div>
-            {/* --- Filter Dropdowns --- */}
+            {/* Dropdown lọc */}
             <div className="flex space-x-2 flex-wrap">
-              {/* <<< XÓA Dropdown lọc theo Type ở đây >>> */}
-              {/*
               <select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
@@ -330,13 +373,12 @@ export default function ManageDevicesPage() {
                 aria-label="Filter by device type"
               >
                 <option value="">Tất cả loại</option>
+                {/* Lấy key từ deviceTypeStyles để tạo options */}
                 {Object.keys(deviceTypeStyles).filter(key => key !== 'default').map(typeKey => (
                   <option key={typeKey} value={typeKey}>{deviceTypeStyles[typeKey].icon} {typeKey}</option>
                 ))}
               </select>
-              */}
 
-              {/* --- Dropdown lọc theo State (Giữ lại) --- */}
               <select
                 value={filterState}
                 onChange={(e) => setFilterState(e.target.value)}
@@ -352,26 +394,25 @@ export default function ManageDevicesPage() {
 
           {/* Các nút chức năng */}
           <div className="flex space-x-2 w-full md:w-auto justify-end flex-wrap">
-             {/* Refresh Button */}
-             <button
-                onClick={handleRefresh}
-                className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200 disabled:opacity-50"
-                disabled={isRefreshing || isLoading}
-                aria-label="Refresh device list"
-              >
-                {isRefreshing ? <Loader2 size={18} className="mr-2 animate-spin" /> : <RefreshCw size={18} className="mr-2" />}
-                Làm mới
-              </button>
-            {/* Export Button */}
-             <button
-                onClick={handleExportCSV}
-                className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200"
-                aria-label="Export devices to CSV"
-              >
-                <DownloadCloud size={18} className="mr-2" />
-                Xuất CSV
-              </button>
-            {/* Add Button */}
+            <button
+              onClick={handleRefresh}
+              className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-md shadow-sm hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200 disabled:opacity-50"
+              disabled={isRefreshing || isLoading} // Disable khi đang loading hoặc refresh
+              aria-label="Refresh device list"
+            >
+              {isRefreshing ? <Loader2 size={18} className="mr-2 animate-spin" /> : <RefreshCw size={18} className="mr-2" />}
+              Làm mới
+            </button>
+
+            <button
+              onClick={handleExportCSV}
+              className="inline-flex items-center px-3 py-2 bg-green-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200"
+              aria-label="Export devices to CSV"
+            >
+              <DownloadCloud size={18} className="mr-2" />
+              Xuất CSV
+            </button>
+
             <button
               onClick={handleAddClick}
               className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 transform hover:scale-105"
@@ -384,18 +425,16 @@ export default function ManageDevicesPage() {
         </div>
       </div>
 
-      {/* Info Bar: Items count & Items per page */}
+      {/* Thông tin số lượng và items per page */}
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 text-sm text-gray-600 space-y-2 sm:space-y-0">
-        <span>
-          Hiển thị {getCurrentDevices().length > 0 ? ((currentPage - 1) * itemsPerPage) + 1 : 0} - {Math.min(currentPage * itemsPerPage, filteredDevices.length)} trên tổng số {filteredDevices.length} thiết bị được lọc
-        </span>
+        <span>Hiển thị {getCurrentDevices().length} trên tổng số {filteredDevices.length} thiết bị được lọc</span>
         <div className="flex items-center space-x-2">
           <span>Số mục/trang:</span>
           <select
             value={itemsPerPage}
             onChange={(e) => {
-              setItemsPerPage(Number(e.target.value));
-              // Không cần reset page ở đây vì useEffect [itemsPerPage, filteredDevices.length, currentPage] sẽ xử lý
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1); // Reset về trang đầu khi thay đổi số mục
             }}
             className="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500"
             aria-label="Items per page"
@@ -410,50 +449,46 @@ export default function ManageDevicesPage() {
 
       {/* Loading State */}
       {isLoading && !isRefreshing && (
-         <div className="bg-white rounded-lg shadow-md p-8 flex flex-col items-center justify-center text-center h-64">
-           <Loader2 size={40} className="text-indigo-600 animate-spin mb-4" />
-           <p className="text-gray-600 text-lg font-medium">Đang tải danh sách thiết bị...</p>
-           <p className="text-gray-500 text-sm">Vui lòng đợi trong giây lát.</p>
-         </div>
+        <div className="bg-white rounded-lg shadow-md p-8 flex flex-col items-center justify-center text-center h-64">
+          <Loader2 size={40} className="text-indigo-600 animate-spin mb-4" />
+          <p className="text-gray-600 text-lg font-medium">Đang tải danh sách thiết bị...</p>
+          <p className="text-gray-500 text-sm">Vui lòng đợi trong giây lát.</p>
+        </div>
       )}
 
-      {/* Error State (for fetching list) */}
+      {/* Error State */}
       {error && !isLoading && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-md mb-6"> {/* Thêm margin bottom */}
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md shadow-md">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-6 w-6 text-red-400" fill="currentColor" viewBox="0 0 20 20" aria-hidden="true">
-                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm0-1.5a6.5 6.5 0 110-13 6.5 6.5 0 010 13zM9 9a1 1 0 011-1h.01a1 1 0 110 2H10a1 1 0 01-1-1zm.707 4.707a1 1 0 01-1.414-1.414L9.586 11l-.293-.293a1 1 0 011.414-1.414l.293.293 1.293-1.293a1 1 0 111.414 1.414L11.414 11l.293.293a1 1 0 01-1.414 1.414l-.293-.293-1.293 1.293z" clipRule="evenodd" />
+              {/* Icon Alert */}
+              <svg className="h-6 w-6 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099a.75.75 0 01.942 0l6.25 5.5a.75.75 0 01-.017 1.113l-6.25 5.5a.75.75 0 01-1.114-.958L14.243 10 7.028 4.244a.75.75 0 011.114-.958zM10 18a8 8 0 100-16 8 8 0 000 16zm0-1.5a6.5 6.5 0 110-13 6.5 6.5 0 010 13z" clipRule="evenodd" />
               </svg>
             </div>
             <div className="ml-3">
               <h3 className="text-sm font-medium text-red-800">Lỗi tải dữ liệu</h3>
               <div className="mt-2 text-sm text-red-700">
-                <p className="break-words">{error}</p>
+                <p>{error}</p>
               </div>
-               <button
-                  onClick={() => fetchDevices(false)} // Nút thử lại gọi fetchDevices
-                  className="mt-2 px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  Thử lại
-               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Device Table Container */}
-      {!isLoading && !error && ( // Chỉ hiển thị bảng khi không loading và không có lỗi fetch list
+      {/* Device Table Container with smooth transition */}
+      {!isLoading && !error && (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="bg-white overflow-hidden shadow-md rounded-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="bg-white overflow-hidden shadow-md rounded-lg"
         >
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-               <thead className="bg-gray-50 sticky top-0 z-10">
+              <thead className="bg-gray-50 sticky top-0 z-10"> {/* Sticky header */}
                 <tr>
+                  {/* Header Cells */}
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feed</th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại</th>
@@ -465,54 +500,79 @@ export default function ManageDevicesPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 <AnimatePresence initial={false}>
                   {getCurrentDevices().length === 0 ? (
-                    <motion.tr initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.3 }}>
+                    // Display when no devices match filters/search
+                    <motion.tr
+                      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
                       <td colSpan={6} className="px-6 py-16 text-center text-gray-500">
                         <div className="flex flex-col items-center justify-center">
-                           {/* Icon thay đổi tùy theo có filter hay không */}
-                           {(searchTerm || filterState) ? <Filter size={40} className="text-gray-400 mb-3" /> : <Search size={40} className="text-gray-400 mb-3" />}
+                          <Filter size={40} className="text-gray-400 mb-3" />
                           <p className="text-base font-medium">Không tìm thấy thiết bị nào</p>
-                           {(searchTerm || filterState)
-                              ? <p className="text-sm text-gray-400 mt-1">Hãy thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.</p>
-                              : <p className="text-sm text-gray-400 mt-1">Hiện chưa có thiết bị nào. Hãy thêm thiết bị mới.</p>
-                            }
+                          <p className="text-sm text-gray-400 mt-1">Hãy thử điều chỉnh bộ lọc hoặc thêm thiết bị mới.</p>
                         </div>
                       </td>
                     </motion.tr>
                   ) : (
+                    // Map through devices for the current page
                     getCurrentDevices().map((device, index) => {
+                      // Get styles based on type and state
                       const typeStyle = deviceTypeStyles[device.type as keyof typeof deviceTypeStyles] || deviceTypeStyles.default;
                       const stateStyle = deviceStateStyles[device.state as keyof typeof deviceStateStyles] || deviceStateStyles.default;
+
                       return (
+                        // Animate each row
                         <motion.tr
-                          key={device.id}
-                          layout
+                          key={device.id} // Important for AnimatePresence
+                          layout // Enable layout animation
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, transition: { duration: 0.2 } }}
                           transition={{ duration: 0.3, delay: index * 0.03 }}
                           className="hover:bg-gray-50 transition-colors duration-150"
                         >
-                          {/* --- Table Cells --- */}
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 max-w-xs" title={device.id}><div className="truncate">{device.id}</div></td>
+                          {/* ID Cell */}
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-500 max-w-xs" title={device.id}>
+                            <div className="truncate">{device.id}</div>
+                          </td>
+                           {/* Feed Cell */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{device.feed}</td>
+                           {/* Type Cell */}
                           <td className="px-6 py-4 whitespace-nowrap">
-                              <span className={`px-2.5 py-1 inline-flex items-center text-xs leading-4 font-semibold rounded-full ${typeStyle.bgColor} ${typeStyle.textColor}`}>
-                                <span className="mr-1.5">{typeStyle.icon}</span>
-                                {device.type || 'N/A'}
-                              </span>
+                            <span className={`px-2.5 py-1 inline-flex items-center text-xs leading-4 font-semibold rounded-full ${typeStyle.bgColor} ${typeStyle.textColor} transition-all duration-200 ease-in-out`}>
+                              <span className="mr-1.5">{typeStyle.icon}</span>
+                              {device.type || 'N/A'}
+                            </span>
                           </td>
+                           {/* State Cell */}
                           <td className="px-6 py-4 whitespace-nowrap text-center">
-                              <span className={`px-2.5 py-1 inline-flex items-center text-xs leading-4 font-semibold rounded-full ${stateStyle.bgColor} ${stateStyle.textColor} ${device.state === 'ON' ? stateStyle.pulseClass : ''}`}>
-                                <span className="mr-1.5">{stateStyle.icon}</span>
-                                {device.state || 'N/A'}
-                              </span>
+                            <span className={`px-2.5 py-1 inline-flex items-center text-xs leading-4 font-semibold rounded-full ${stateStyle.bgColor} ${stateStyle.textColor} ${device.state === 'ON' ? stateStyle.pulseClass : ''} transition-all duration-200 ease-in-out`}>
+                              <span className="mr-1.5">{stateStyle.icon}</span>
+                              {device.state || 'N/A'}
+                            </span>
                           </td>
+                          {/* Username Cell */}
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{device.adaUsername || '-'}</td>
+                           {/* Actions Cell */}
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                              <div className="flex justify-end space-x-2">
-                                  <button onClick={() => handleEditClick(device)} className="p-1.5 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 hover:text-indigo-800 transition-all duration-200 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-400" aria-label={`Edit device ${device.feed}`}><Edit size={16} /></button>
-                                  <button onClick={() => handleDeleteClick(device.id)} className="p-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 hover:text-red-800 transition-all duration-200 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-400" aria-label={`Delete device ${device.feed}`}><Trash2 size={16} /></button>
-                              </div>
+                            <div className="flex justify-end space-x-2">
+                              {/* Edit Button */}
+                              <button
+                                onClick={() => handleEditClick(device)}
+                                className="p-1.5 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 hover:text-indigo-800 transition-all duration-200 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                                aria-label={`Edit device ${device.feed}`}
+                              >
+                                <Edit size={16} />
+                              </button>
+                              {/* Delete Button */}
+                              <button
+                                onClick={() => handleDeleteClick(device.id)}
+                                className="p-1.5 bg-red-50 text-red-600 rounded-md hover:bg-red-100 hover:text-red-800 transition-all duration-200 transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-400"
+                                aria-label={`Delete device ${device.feed}`}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </td>
                         </motion.tr>
                       );
@@ -523,73 +583,125 @@ export default function ManageDevicesPage() {
             </table>
           </div>
 
-          {/* Pagination Controls */}
+          {/* Pagination Controls - Chỉ hiển thị nếu có nhiều hơn 1 trang */}
           {totalPages > 1 && (
             <div className="px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6 bg-white">
               {/* Mobile Pagination */}
-               <div className="flex-1 flex justify-between sm:hidden">
-                 <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>Trước</button>
-                 <span className="text-sm text-gray-700">Trang {currentPage} / {totalPages}</span>
-                 <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}`}>Sau</button>
-               </div>
-               {/* Desktop Pagination */}
+              <div className="flex-1 flex justify-between sm:hidden">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${currentPage === 1 ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                  Trước
+                </button>
+                <span className="text-sm text-gray-700">
+                  Trang {currentPage} / {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${currentPage === totalPages ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-white text-gray-700 hover:bg-gray-50'}`}
+                >
+                  Sau
+                </button>
+              </div>
+              {/* Desktop Pagination */}
               <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
                 <div>
-                   <p className="text-sm text-gray-700">
-                      Hiển thị <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> đến{' '}
-                      <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredDevices.length)}</span> của{' '}
-                      <span className="font-medium">{filteredDevices.length}</span> thiết bị
-                    </p>
+                  <p className="text-sm text-gray-700">
+                    Hiển thị <span className="font-medium">{((currentPage - 1) * itemsPerPage) + 1}</span> đến{' '}
+                    <span className="font-medium">{Math.min(currentPage * itemsPerPage, filteredDevices.length)}</span> của{' '}
+                    <span className="font-medium">{filteredDevices.length}</span> thiết bị
+                  </p>
                 </div>
                 <div>
                   <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                    <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 ${currentPage === 1 ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-50'}`} aria-label="Previous page"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
-                    {/* Page Numbers Logic (Giữ nguyên) */}
-                     {Array.from({ length: totalPages }).map((_, index) => {
-                        const pageNumber = index + 1;
-                        const isCurrent = pageNumber === currentPage;
-                        const showPage = pageNumber === 1 || pageNumber === totalPages || (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1);
-                        const showEllipsisBefore = pageNumber === currentPage - 2 && currentPage > 3;
-                        const showEllipsisAfter = pageNumber === currentPage + 2 && currentPage < totalPages - 2;
+                    {/* Previous Button */}
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 ${currentPage === 1 ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-50'}`}
+                      aria-label="Previous page"
+                    >
+                      <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                    </button>
 
-                        if (showEllipsisBefore || showEllipsisAfter) {
-                           return <span key={`ellipsis-${pageNumber}`} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">...</span>;
-                        }
-                        if (showPage) {
-                           return <button key={pageNumber} onClick={() => handlePageChange(pageNumber)} className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${isCurrent ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600' : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'}`} aria-current={isCurrent ? 'page' : undefined}>{pageNumber}</button>;
-                         }
-                        return null;
-                      })}
-                    <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 ${currentPage === totalPages ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-50'}`} aria-label="Next page"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
+                    {/* Page Numbers Logic */}
+                    {Array.from({ length: totalPages }).map((_, index) => {
+                      const pageNumber = index + 1;
+                      const isCurrent = pageNumber === currentPage;
+                      // Logic to show only relevant page numbers (first, last, current, adjacent, ellipses)
+                      const showPage = pageNumber === 1 ||
+                                        pageNumber === totalPages ||
+                                        (pageNumber >= currentPage - 1 && pageNumber <= currentPage + 1);
+                      const showEllipsisBefore = pageNumber === currentPage - 2 && currentPage > 3;
+                      const showEllipsisAfter = pageNumber === currentPage + 2 && currentPage < totalPages - 2;
+
+                      if (showEllipsisBefore || showEllipsisAfter) {
+                        return (
+                          <span key={`ellipsis-${pageNumber}`} className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                            ...
+                          </span>
+                        );
+                      }
+
+                      if (showPage) {
+                        return (
+                          <button
+                            key={pageNumber}
+                            onClick={() => handlePageChange(pageNumber)}
+                            className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                              isCurrent
+                                ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                                : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                            }`}
+                            aria-current={isCurrent ? 'page' : undefined}
+                          >
+                            {pageNumber}
+                          </button>
+                        );
+                      }
+                      return null; // Don't render other page numbers
+                    })}
+
+                     {/* Next Button */}
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 ${currentPage === totalPages ? 'cursor-not-allowed opacity-50' : 'hover:bg-gray-50'}`}
+                       aria-label="Next page"
+                    >
+                      <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                    </button>
                   </nav>
                 </div>
               </div>
             </div>
-          )}
+          )} {/* End Pagination */}
         </motion.div>
       )} {/* End Table Container */}
 
 
-      {/* --- Modals --- */}
-      {isModalOpen && ( // Render modal chỉ khi isModalOpen là true để đảm bảo useEffect trong modal chạy đúng lúc
-         <AddEditDeviceModal
-            isOpen={isModalOpen}
-            onClose={handleModalClose}
-            // <<< Sử dụng onSuccess thay vì onSubmit >>>
-            onSuccess={handleModalSuccess}
-            initialData={editingDevice}
-            defaultAdaUsername={defaultAdaUsername}
-            defaultAdaApiKey={defaultAdaApiKey}
-          />
-       )}
+      {/* Modals Rendered Here */}
+      <AddEditDeviceModal
+     isOpen={isModalOpen}
+     onClose={handleModalClose}
+     mode={editingDevice ? 'edit' : 'add'} // <<< Xác định mode
+     initialData={editingDevice}         // <<< Truyền initialData
+     onSave={handleModalSubmit}          // <<< Đổi tên hàm này thành handleSaveDevice cho nhất quán?
+     onDelete={handleDeleteClick}      // <<< Truyền hàm yêu cầu xóa
+     defaultAdaUsername={defaultAdaUsername}
+     defaultAdaApiKey={defaultAdaApiKey}
+ />
 
-      <DeleteConfirmationModal
-        isOpen={showDeleteConfirm}
-        onClose={handleDeleteModalClose}
-        onConfirm={confirmDelete}
-        deviceName={devices.find(d => d.id === deletingDeviceId)?.feed || deletingDeviceId || 'this device'}
-        isLoading={isDeleting}
-      />
+<DeleteConfirmationModal
+     isOpen={showDeleteConfirm}
+     onClose={handleDeleteModalClose}
+     onConfirm={confirmDelete}
+     deviceName={devices.find(d => d.id === deletingDeviceId)?.feed || deletingDeviceId || 'this device'}
+     isLoading={isDeleting}
+ />
 
     </div> // End main container div
   );

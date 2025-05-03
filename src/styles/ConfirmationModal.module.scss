@@ -1,0 +1,68 @@
+/* styles/ConfirmationModal.module.scss */
+
+.container {
+    padding: 1rem;        // Khoảng cách bên trong
+    text-align: center;   // Căn giữa nội dung
+  }
+  
+  .iconWrapper {
+    margin: 0 auto 1rem auto; // Căn giữa và tạo khoảng cách dưới
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;          // Kích thước vùng chứa icon
+    height: 48px;
+    background-color: #fee2e2; // Màu nền đỏ nhạt (cho cảnh báo)
+    border-radius: 50%;   // Bo tròn
+  }
+  
+  .icon {
+    color: #ef4444;       // Màu đỏ cho icon cảnh báo
+  }
+  
+  .title {
+    font-size: 1.125rem; // Tương đương text-lg của Tailwind
+    font-weight: 600;    // Tương đương font-semibold
+    color: #1f2937;      // Màu chữ tối (gray-800)
+    margin-bottom: 0.5rem;
+  }
+  
+  .message {
+    font-size: 0.875rem; // Tương đương text-sm
+    color: #6b7280;      // Màu chữ xám (gray-500)
+    margin-bottom: 1.5rem; // Khoảng cách dưới cùng trước khi tới nút
+  
+    // Style cho các thẻ p bên trong nếu message là JSX
+    p {
+      line-height: 1.5;
+    }
+  }
+  
+  .buttonGroup {
+    display: flex;
+    flex-direction: column-reverse; // Trên mobile nút Confirm ở dưới
+    gap: 0.75rem;         // Khoảng cách giữa các nút
+  
+    // Trên màn hình lớn hơn (sm trở lên)
+    @media (min-width: 640px) {
+      flex-direction: row;
+      justify-content: flex-end; // Đẩy nút về bên phải
+      gap: 1rem;
+    }
+  }
+  
+  // Có thể thêm style riêng cho nút Cancel/Confirm nếu cần override commonStyles
+  .cancelButton {
+    // Ví dụ: Thêm style riêng nếu cần
+  }
+  
+  .confirmButton {
+    // Ví dụ: đảm bảo nó dùng màu danger
+    // Nếu bạn đã định nghĩa .dangerButton trong commonStyles thì không cần thêm gì ở đây
+    // Nếu không, bạn có thể định nghĩa màu đỏ ở đây:
+    // background-color: #dc2626; // Màu đỏ (red-600)
+    // color: white;
+    // &:hover:not(:disabled) {
+    //   background-color: #b91c1c; // Màu đỏ đậm hơn (red-700)
+    // }
+  }

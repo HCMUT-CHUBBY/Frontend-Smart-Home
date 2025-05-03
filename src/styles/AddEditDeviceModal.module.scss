@@ -1,0 +1,232 @@
+/* styles/AddEditDeviceModal.module.scss */
+@import 'variable'; // Ví dụ nếu bạn có file biến màu sắc, font...
+
+// Nút đóng X ở góc trên bên phải
+.closeButton {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  padding: 0.25rem;
+  border-radius: 9999px;
+  background-color: #f3f4f6; // gray-100
+  color: #6b7280; // gray-500
+  transition: background-color 0.2s ease;
+  &:hover {
+    background-color: #e5e7eb; // gray-200
+  }
+
+  &:focus {
+    outline: none;
+    // --- SỬA Ở ĐÂY ---
+    // Thay thế biến $primary-color-light bằng giá trị màu cụ thể
+    // Ví dụ dùng màu focus ring của Indigo-500:
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5);
+    // Hoặc một màu khác bạn muốn, ví dụ:
+    // box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5); // blue-500 focus ring
+  }
+
+  svg { // Style cho icon bên trong nút
+    width: 1.125rem; // size-18
+    height: 1.125rem;
+  }
+}
+
+// Phần Header của Modal
+.header {
+  text-align: center;
+  margin-bottom: 1.5rem; // mb-6
+}
+
+.headerIconWrapper {
+  display: inline-flex; // Để căn giữa dễ dàng
+  align-items: center;
+  justify-content: center;
+  width: 3.5rem;  // w-14
+  height: 3.5rem; // h-14
+  border-radius: 50%;
+  background-color: #e0e7ff; // Màu nền nhạt (ví dụ: indigo-100)
+  margin-bottom: 1rem; // mb-4
+}
+
+.headerIcon {
+  width: 1.5rem; // size-24
+  height: 1.5rem;
+  color: #4f46e5; // Màu chính (ví dụ: indigo-600)
+}
+
+.headerTitle {
+  font-size: 1.25rem; // text-xl
+  font-weight: 700;   // font-bold
+  color: #1f2937;     // gray-800
+}
+
+.headerSubtitle {
+  font-size: 0.875rem; // text-sm
+  color: #6b7280;       // gray-500
+  margin-top: 0.25rem; // mt-1
+}
+
+// Hộp thông báo lỗi
+.errorBox {
+  margin-bottom: 1rem; // mb-4
+  padding: 0.75rem;    // p-3
+  background-color: #fef2f2; // bg-red-50
+  border-left: 4px solid #ef4444; // border-l-4 border-red-500
+  border-radius: 0.375rem; // rounded-md
+  display: flex;
+  align-items: flex-start;
+
+  svg {
+    color: #ef4444; // text-red-500
+    margin-top: 0.125rem; // mt-0.5
+    margin-right: 0.5rem; // mr-2
+    flex-shrink: 0;
+    width: 1.125rem; // size-18
+    height: 1.125rem;
+  }
+
+  p {
+    font-size: 0.875rem; // text-sm
+    color: #dc2626;     // text-red-600
+  }
+}
+
+// Form chính
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem; // Tương đương space-y-5
+}
+
+// Phần cấu hình thiết bị
+.configSection {
+  padding-top: 0.5rem; // pt-2
+}
+
+.configTitle {
+  font-size: 0.875rem; // text-sm
+  font-weight: 500; // font-medium
+  color: #4b5563;  // gray-600
+  margin-bottom: 0.75rem;
+  text-align: center;
+  border-bottom: 1px solid #e5e7eb; // gray-200
+  line-height: 0.1em; // Thủ thuật để căn giữa text với đường kẻ
+  span { // Nếu bạn muốn đặt text vào giữa đường kẻ
+    background: #fff; // Màu nền modal
+    padding: 0 10px;
+  }
+}
+
+.configGrid {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr)); // Mặc định 1 cột
+  gap: 1rem; // Khoảng cách giữa các input config
+
+  // 2 cột trên màn hình lớn hơn
+  @media (min-width: 640px) { // sm breakpoint
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.25rem; // Tăng khoảng cách
+  }
+}
+
+// Style cho select có icon bên trái
+.selectIcon {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding-left: 0.75rem; // pl-3
+  pointer-events: none; // Không cho click vào icon
+}
+
+// Style cho mũi tên dropdown của select
+.selectChevron {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  padding-right: 0.75rem; // pr-3
+  pointer-events: none;
+  color: #6b7280; // gray-500
+}
+
+// Thông báo khi không có config
+.noConfigText {
+    font-size: 0.875rem;
+    color: #6b7280;
+    text-align: center;
+    padding: 0.5rem 0;
+}
+
+// Phần Credentials
+.credentialsSection {
+  padding-top: 0.5rem; // pt-2
+}
+
+// Đường kẻ phân cách có chữ
+.sectionDivider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 1rem; // mb-4
+  color: #6b7280; // gray-500
+  font-size: 0.875rem;
+  font-weight: 500;
+
+  &::before,
+  &::after {
+    content: '';
+    flex-grow: 1;
+    border-bottom: 1px solid #e5e7eb; // gray-200
+  }
+
+  span {
+    flex-shrink: 0;
+    padding: 0 0.75rem; // px-3
+  }
+}
+
+// Nút ẩn/hiện password
+.passwordToggle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  padding-right: 0.75rem; // pr-3
+  color: #6b7280; // gray-500
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color:#4f46e5; // Màu primary khi hover
+  }
+}
+
+
+// Nhóm nút ở Footer
+.footerButtonGroup {
+  display: flex;
+  flex-direction: column-reverse; // Nút chính ở dưới trên mobile
+  padding-top: 1.25rem; // pt-5
+  gap: 0.75rem;
+
+  // Trên màn hình lớn hơn
+  @media (min-width: 640px) { // sm breakpoint
+    flex-direction: row;
+    justify-content: flex-end; // Đẩy về bên phải
+    gap: 1rem; // space-x-4
+  }
+
+  // Đẩy nút Delete sang trái nếu có
+  :global(.mr-auto) { // Sử dụng :global nếu class đến từ commonStyles
+      margin-right: auto !important;
+  }
+}
