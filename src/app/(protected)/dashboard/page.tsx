@@ -446,7 +446,7 @@ const handleDeviceUpdate = useCallback((updatedDeviceData: Device) => { // Nhậ
         // Quan trọng: Ném lỗi lại để modal biết và không tự đóng
         throw error; // <<< Ném lỗi lại
      } finally {
-      // setIsLoading(false);
+       //setIsLoading(false);
     }
   }, [loadDevices, handleDeviceUpdate, selectedDevice, closeDeviceModal]); // Thêm dependency
   // Xử lý xóa device

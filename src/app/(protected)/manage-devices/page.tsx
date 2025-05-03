@@ -10,10 +10,16 @@ import 'react-toastify/dist/ReactToastify.css';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import apiClient from '@/lib/apiClient';
-import { Device, DeviceDTO, ApiResponse } from '@/lib/types';
+import {
+  DeviceFromAPI, // Kiểu dữ liệu gốc từ API
+  Device,        // Kiểu dữ liệu đã xử lý (có type, isSensor)
+  DeviceDTO,
+  ApiResponse
+} from '@/lib/types';
 // Giả sử các component này nằm trong thư mục components/Management
-import AddEditDeviceModal from '@/components/management/AddEditDeviceModal';
-
+import { processDeviceList, processDeviceData } from '@/lib/deviceUtils'; // Import hàm xử lý
+import AddEditDeviceModal from '@/components/management/AddEditDeviceModal'; // <<< Sửa đường dẫn nếu cần
+//import DeleteConfirmationModal from '@/components/ui/ConformModal'; 
 import DeleteConfirmationModal from '@/components/management/DeleteConfirmationModal';
 
 // --- Helper Functions ---
@@ -25,11 +31,9 @@ const getDefaultAdaCredentials = () => ({
 // Định nghĩa các loại thiết bị và trạng thái với các màu sắc tương ứng (Thêm icon và hỗ trợ nhiều loại hơn)
 const deviceTypeStyles: { [key: string]: { bgColor: string; textColor: string; icon: string } } = {
   'TEMP': { bgColor: 'bg-blue-100', textColor: 'text-blue-800', icon: '🌡️' },
-  'HUMID': { bgColor: 'bg-cyan-100', textColor: 'text-cyan-800', icon: '💧' },
+  
   'LIGHT': { bgColor: 'bg-yellow-100', textColor: 'text-yellow-800', icon: '💡' },
-  'MOTION': { bgColor: 'bg-orange-100', textColor: 'text-orange-800', icon: '👁️' },
-  'DOOR': { bgColor: 'bg-teal-100', textColor: 'text-teal-800', icon: '🚪' },
-  'FAN': { bgColor: 'bg-indigo-100', textColor: 'text-indigo-800', icon: '🌬️' },
+  
   'default': { bgColor: 'bg-gray-100', textColor: 'text-gray-800', icon: '⚙️' },
 };
 
@@ -72,12 +76,17 @@ export default function ManageDevicesPage() {
     setError(null);
     console.log("Fetching devices...");
     try {
-      const response = await apiClient.get<ApiResponse<Device[]>>('/devices');
-      if (response.data?.data) {
-        console.log("Devices fetched:", response.data.data);
-        setDevices(response.data.data);
+      const response = await apiClient.get<ApiResponse<DeviceFromAPI[]>>('/devices');
+        if (response.data?.data) {
+            console.log("Raw devices fetched:", response.data.data);
+            // <<< THÊM BƯỚC XỬ LÝ >>>
+            const processedDevices: Device[] = processDeviceList(response.data.data);
+            console.log("Processed devices data:", processedDevices);
+
+            setDevices(processedDevices); // <<< Lưu dữ liệu ĐÃ XỬ LÝ
+            // Apply filter dựa trên dữ liệu đã xử lý
         // Gọi hàm applyFiltersAndSearch ở đây để đảm bảo state devices đã cập nhật
-        applyFiltersAndSearch(response.data.data, searchTerm, filterType, filterState);
+        applyFiltersAndSearch(processedDevices, searchTerm, filterType, filterState);
         if (showToast) {
           toast.info("Device list refreshed!");
         }
@@ -209,10 +218,44 @@ export default function ManageDevicesPage() {
     setIsModalOpen(true);
   };
 
-  const handleEditClick = (device: Device) => {
-    setEditingDevice(device);
-    setIsModalOpen(true);
-  };
+  const handleEditClick = useCallback(async (deviceInput: Device) => { // Nhận Device đã xử lý từ bảng
+    console.log(`Opening edit modal for device: ${deviceInput.id}`);
+    setIsLoading(true); // Có thể dùng loading riêng
+    try {
+        // Fetch lại dữ liệu mới nhất từ API (trả về DeviceFromAPI)
+        const response = await apiClient.get<ApiResponse<DeviceFromAPI>>(`/devices/${deviceInput.id}`);
+        console.log("<<< Response from GET /devices/{id} for Edit:", response.data);
+        if (response.data?.data) {
+            // <<< XỬ LÝ DỮ LIỆU API TRẢ VỀ >>>
+            const processedDevice = processDeviceData(response.data.data);
+
+            // Kiểm tra lại sau khi xử lý
+            if (processedDevice.type === undefined || processedDevice.isSensor === undefined) {
+                console.error(`Processed device ${processedDevice.id} is still missing 'type' or 'isSensor'! Check deviceUtils.`);
+                toast.error("Failed to process device data for editing.");
+                setIsLoading(false);
+                return;
+            }
+            console.log("<<< Data being set to editingDevice:", processedDevice);
+            setEditingDevice(processedDevice); // <<< Lưu Device ĐÃ XỬ LÝ vào state
+            setIsModalOpen(true); // Mở modal sau khi đã có dữ liệu
+        } else {
+            toast.error("Could not load device details (no data).");
+        }
+    } catch (error: unknown) {
+         console.error(`Error fetching details for ${deviceInput.id}:`, error);
+         // ... xử lý lỗi toast ...
+         if (axios.isAxiosError(error)) {
+             toast.error(`Failed to load details: ${error.response?.data?.message || error.message}`);
+         } else if (error instanceof Error) {
+             toast.error(`Failed to load details: ${error.message}`);
+         } else {
+            toast.error("Failed to load details: Unknown error.");
+        }
+    } finally {
+      setIsLoading(false);
+    }
+}, []); // Không cần dependencies nếu chỉ dựa vào deviceInput
 
   const handleDeleteClick = (deviceId: string) => {
     setDeletingDeviceId(deviceId);
@@ -254,21 +297,35 @@ export default function ManageDevicesPage() {
              }
 
              // Chỉ lấy các trường được phép cập nhật từ deviceData (dữ liệu từ form)
-             const putPayload: Partial<DeviceDTO> = {
-                 feed: deviceData.feed,
-                 adaUsername: deviceData.adaUsername,
-                 deviceConfig: deviceData.deviceConfig,
-                  // Chỉ gửi adaApikey nếu người dùng đã nhập giá trị MỚI vào form
-                 ...(deviceData.adaApikey && { adaApikey: deviceData.adaApikey }),
-             };
+             // <<< TẠO PUT PAYLOAD ĐÚNG >>>
+            const putPayload: DeviceDTO = {
+              // id: editingDevice.id, // Thường không cần id trong body PUT
 
-             console.log("Payload for PUT:", putPayload);
-             // <<< Dùng editingDevice.id cho URL >>>
-             response = await apiClient.put<ApiResponse<unknown>>(`/devices/${editingDevice.id}`, putPayload);
-             successMessage = response.data?.message || "Device updated successfully!";
-             toast.success(successMessage);
-             handleModalClose(); // <<< Dùng hàm đóng modal của trang này
-             await fetchDevices(); // <<< Tải lại danh sách (thay vì gọi handleDeviceUpdate)
+              // Lấy từ form modal gửi về (deviceData)
+              feed: deviceData.feed,
+              adaUsername: deviceData.adaUsername,
+              deviceConfig: deviceData.deviceConfig ?? {},
+              adaApikey: deviceData.adaApikey, // Lấy từ form
+
+              // Lấy từ state editingDevice gốc (ĐÃ ĐƯỢC XỬ LÝ)
+              type: editingDevice.type,       // <<< Lấy từ editingDevice
+              isSensor: editingDevice.isSensor, // <<< Lấy từ editingDevice
+              state: editingDevice.state,     // <<< Lấy từ editingDevice
+          };
+
+          // Xử lý api key nếu form trống và backend yêu cầu NotBlank
+          if (!putPayload.adaApikey && editingDevice.adaApikey) {
+              // putPayload.adaApikey = editingDevice.adaApikey;
+          }
+           // Xóa ID nếu không cần trong body
+           // delete putPayload.id;
+
+          console.log("Payload for PUT:", JSON.stringify(putPayload, null, 2));
+          const response = await apiClient.put<ApiResponse<unknown>>(`/devices/${editingDevice.id}`, putPayload);
+          // ... xử lý success ...
+          toast.success(response.data?.message || "Device updated successfully!");
+          handleModalClose();
+          await fetchDevices(); // Load lại
          } else {
              throw new Error("Invalid mode specified.");
          }
@@ -515,11 +572,13 @@ export default function ManageDevicesPage() {
                     </motion.tr>
                   ) : (
                     // Map through devices for the current page
-                    getCurrentDevices().map((device, index) => {
+                    getCurrentDevices().map((device:Device, index) => {
                       // Get styles based on type and state
                       const typeStyle = deviceTypeStyles[device.type as keyof typeof deviceTypeStyles] || deviceTypeStyles.default;
                       const stateStyle = deviceStateStyles[device.state as keyof typeof deviceStateStyles] || deviceStateStyles.default;
-
+                      if (device.type === undefined || device.isSensor === undefined) {
+                        return <tr key={device.id || index}><td colSpan={6}>Error loading device data.</td></tr>;
+                    }
                       return (
                         // Animate each row
                         <motion.tr
