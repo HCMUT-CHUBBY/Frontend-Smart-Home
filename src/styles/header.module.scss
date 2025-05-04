@@ -1,6 +1,6 @@
 /* src/styles/header.module.scss */
-@import './variable'; // Import biến dùng chung (Quan trọng!)
-
+@use './variable' as *; // Import biến dùng chung (Quan trọng!)
+@use "sass:color";
 .header {
   height: 64px; // Chiều cao header (tương đương h-16 của Tailwind)
   background-color: $bg-header; // Màu nền từ biến

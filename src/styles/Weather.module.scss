@@ -1,12 +1,12 @@
 /* src/styles/weatherWidget.module.scss */
-@import './DashBoard.module.scss';  // Import the main variables
 
+@use './variable' as *; // Import common variables
 .weatherWidget {
   background: linear-gradient(135deg, $primary-color 0%, $secondary-color 100%);
   color: $text-white;
   border-radius: $border-radius-lg;
   padding: $spacing-lg;
-  box-shadow: $shadow-md;
+  box-shadow: $box-shadow-md;
   display: flex;
   flex-direction: column;
   gap: $spacing-md;

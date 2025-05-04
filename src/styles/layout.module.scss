@@ -1,6 +1,6 @@
 /* src/styles/layout.module.scss */
-@import './variable';
-
+@use './variable' as *;
+@use "sass:color";
 .mainContentWrapper {
     flex: 1;                 // Để chiếm không gian còn lại
     display: flex;

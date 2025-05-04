@@ -1,6 +1,6 @@
 /* styles/AddEditDeviceModal.module.scss */
-@import 'variable'; // Ví dụ nếu bạn có file biến màu sắc, font...
-
+@use './variable' as *; // Ví dụ nếu bạn có file biến màu sắc, font...
+@use "sass:color";
 // Nút đóng X ở góc trên bên phải
 .closeButton {
   position: absolute;

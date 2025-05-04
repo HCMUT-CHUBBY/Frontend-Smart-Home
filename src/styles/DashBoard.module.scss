@@ -1,6 +1,7 @@
 /* src/styles/DashBoard.module.scss */
 // Variables
-@import './variable';// Import your variables file
+@use './variable' as *;
+@use "sass:color";
 $primary-color: #3b82f6; // Blue 500
 $primary-hover: #2563eb; // Blue 600 
 $primary-light: #dbeafe; // Blue 100
@@ -377,7 +378,7 @@ $breakpoint-xl: 1280px;
   }
   
   &.secondary {
-    background-color: transparentize($secondary-color, 0.9);
+    background-color: color.adjust($secondary-color, $alpha: -0.9);
     color: $secondary-color;
     
     &:hover {
@@ -387,7 +388,7 @@ $breakpoint-xl: 1280px;
   }
   
   &.danger {
-    background-color: transparentize($danger-color, 0.9);
+    background-color: color.adjust($danger-color, $alpha: -0.9);
     color: $danger-color;
     
     &:hover {
