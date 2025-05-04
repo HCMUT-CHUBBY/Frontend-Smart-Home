@@ -313,12 +313,32 @@ export default function ManageDevicesPage() {
               state: editingDevice.state,     // <<< Lấy từ editingDevice
           };
 
-          // Xử lý api key nếu form trống và backend yêu cầu NotBlank
           if (!putPayload.adaApikey && editingDevice.adaApikey) {
-              // putPayload.adaApikey = editingDevice.adaApikey;
-          }
-           // Xóa ID nếu không cần trong body
-           // delete putPayload.id;
+            // Nếu key trong form trống/null/undefined VÀ key gốc có giá trị:
+            console.log("[Save Edit] API Key form input is blank. Using original key.");
+            // <<< BỎ COMMENT DÒNG NÀY để gửi key cũ đi >>>
+            putPayload.adaApikey = editingDevice.adaApikey;
+        } else if (putPayload.adaApikey) {
+            // Nếu người dùng có nhập key mới vào form
+            console.log("[Save Edit] API Key provided in form, using new key.");
+            // Không cần làm gì thêm, key mới đã có trong putPayload
+        } else {
+            // Trường hợp cả key mới (form) và key cũ (editingDevice) đều không có giá trị (null/undefined/rỗng)
+            console.warn("!!! Both new and old API Key are blank/null. Sending empty string.");
+            // Gửi chuỗi rỗng để đảm bảo trường adaApikey tồn tại (nhưng vẫn có thể lỗi @NotBlank ở backend)
+            putPayload.adaApikey = '';
+        }
+        // --- KẾT THÚC PHẦN SỬA ---
+    
+         // Kiểm tra cuối cùng nếu backend thực sự yêu cầu @NotBlank
+         if (!putPayload.adaApikey) {
+             console.error("!!! CRITICAL: adaApikey is empty before sending PUT request! Backend @NotBlank validation WILL likely fail.");
+             // Có thể hiển thị lỗi sớm ở đây
+             // toast.error("Adafruit API Key cannot be empty.");
+             // setIsLoading(false); // Nếu có quản lý loading ở đây
+             // return; // Không gửi request
+         }
+    
 
           console.log("Payload for PUT:", JSON.stringify(putPayload, null, 2));
           const response = await apiClient.put<ApiResponse<unknown>>(`/devices/${editingDevice.id}`, putPayload);
