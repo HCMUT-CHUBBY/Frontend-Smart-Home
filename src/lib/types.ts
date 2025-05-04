@@ -21,8 +21,55 @@ export interface Device extends DeviceFromAPI {
     type: "TEMP" | "LIGHT"; // Kiểu suy luận được
     isSensor: boolean;      // Trạng thái suy luận được
 }
+export interface UserDTO {
+  id: number; // Hoặc Long nếu backend dùng Long
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+}
 
-
+export interface DeviceLogDTO {
+  dateTime: string; // API trả về string dạng ISO 8601 OffsetDateTime
+  deviceId: string;
+  user: UserDTO | null; // User có thể null
+  value: string;        // Value dạng string
+  state: string;        // State dạng string ("ON"/"OFF")
+  // Thêm các trường khác nếu có từ backend DTO
+}
+export interface PageDTO<T> {
+  content: T[];          // Mảng chứa dữ liệu của trang hiện tại
+  pageable: {
+      pageNumber: number;
+      pageSize: number;
+      sort: {
+          sorted: boolean;
+          unsorted: boolean;
+          empty: boolean;
+      };
+      offset: number;
+      paged: boolean;
+      unpaged: boolean;
+  };
+  totalPages: number;    // Tổng số trang
+  totalElements: number; // Tổng số phần tử
+  last: boolean;         // Trang cuối cùng?
+  size: number;          // Kích thước trang
+  number: number;        // Số trang hiện tại (bắt đầu từ 0)
+  sort: {
+      sorted: boolean;
+      unsorted: boolean;
+      empty: boolean;
+  };
+  numberOfElements: number; // Số phần tử trong trang hiện tại
+  first: boolean;        // Trang đầu tiên?
+  empty: boolean;        // Trang có rỗng không?
+}
+export interface ChartModalDeviceProps {
+  isOpen: boolean;
+  onClose: () => void;
+  deviceId: string | null;
+  device?: Device | null; // Optional: Truyền device để lấy tên/loại cho chart
+}
 // --- Giữ nguyên DeviceDTO ---
 // Interface này đại diện cho dữ liệu GỬI ĐI (POST/PUT) đến backend
 export interface DeviceDTO {
@@ -85,6 +132,7 @@ export interface DeviceRealtimeState {
         value?: string | number;
     }
 }
+
 export interface AddEditDeviceModalProps {
   isOpen: boolean;
   onClose: () => void;

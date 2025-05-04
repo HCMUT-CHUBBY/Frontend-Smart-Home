@@ -14,7 +14,7 @@ import {
   VolumeX,
 } from "lucide-react";
 
- // Hoặc đường dẫn đúng tới file bạn đã sửa
+import ChartModalDevice from "@/components/dashboard/ChartModalDevice"; // <<< THÊM: Import Modal Chart mới
 import apiClient, { fetchWeather } from "@/lib/apiClient";
 import {
   // <<< SỬA: Import cả DeviceFromAPI và Device >>>
@@ -63,7 +63,10 @@ export default function DashboardPage() {
   const [modalMode, setModalMode] = useState<'add' | 'edit' | null>(null);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
-
+   // <<< THÊM: State cho Chart Modal >>>
+   const [showChartModal, setShowChartModal] = useState(false);
+   const [chartDeviceId, setChartDeviceId] = useState<string | null>(null);
+ 
    // --- Refs (giữ nguyên) ---
    const clickLockRef = useRef<{ [deviceId: string]: boolean }>({});
    const subscriptionsRef = useRef<DeviceSubscriptions>({});
@@ -74,6 +77,11 @@ export default function DashboardPage() {
     realtimeStatesRef.current = realtimeStates;
   }, [realtimeStates]);
 
+  const handleShowChart = useCallback((deviceId: string) => {
+    console.log(`Opening chart for device: ${deviceId}`);
+    setChartDeviceId(deviceId);
+    setShowChartModal(true);
+  }, []); // Dependency rỗng
 
   const loadDevices = useCallback(async () => {
     if (status !== "authenticated") return;
@@ -821,16 +829,14 @@ const handleDeviceUpdate = useCallback((updatedDeviceData: Device) => { // Nhậ
               <DeviceCard
                 key={device.id}
                 device={device}
-                isSensor={isSensor} // <<< Truyền isSensor xuống
+                isSensor={isSensor}
                 currentState={realtimeStates[device.id]?.state}
                 currentValue={realtimeStates[device.id]?.value}
-                // Callbacks
-                onToggle={!isSensor ? () => handleToggleDevice(device) : () => {}}
-                onClick={() => openEditModal(device)} // Mở modal edit
+                onToggle={!isSensor ? () => handleToggleDevice(device) : undefined}
+                onClick={() => openEditModal(device)}
                 onSetSpeed={isTempActuator ? (speed) => handleSetSpeed(device, speed) : undefined}
-                onDeleteRequest={() => openConfirmDeleteModal(device)} // <<< Mở confirm modal
-                // onShowChart={isSensor ? () => handleShowChart(device.id) : undefined} // Chart để sau
-                // Config props
+                onDeleteRequest={() => openConfirmDeleteModal(device)}
+                onShowChart={isSensor ? () => handleShowChart(device.id) : undefined} // <<< TRUYỀN PROP MỚI
                 minSpeed={isTempActuator ? Number(device.deviceConfig?.['minSpeed'] ?? 0) : undefined}
                 maxSpeed={isTempActuator ? Number(device.deviceConfig?.['maxSpeed'] ?? 100) : undefined}
               />
@@ -859,6 +865,11 @@ const handleDeviceUpdate = useCallback((updatedDeviceData: Device) => { // Nhậ
            // Sử dụng optional chaining và default value
            message={`Are you sure you want to delete the device "${deviceToDelete?.feed || 'N/A'}"? This action cannot be undone.`}
        />
+        <ChartModalDevice
+            isOpen={showChartModal}
+            onClose={() => { setShowChartModal(false); setChartDeviceId(null); }}
+            deviceId={chartDeviceId}
+      />
 
     </div>
   );

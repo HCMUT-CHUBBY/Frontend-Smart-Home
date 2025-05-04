@@ -1,7 +1,7 @@
 // components/dashboard/DeviceCard.tsx
 import React, { useMemo, useCallback } from 'react';
 import { Device } from '@/lib/types';
-import { Lightbulb, Thermometer, Power, Trash2} from 'lucide-react';
+import { Lightbulb, Thermometer, Power, Trash2, BarChart2} from 'lucide-react';
 
 // Cập nhật Props Interface (Giống như trước)
 interface DeviceCardProps {
@@ -13,7 +13,7 @@ interface DeviceCardProps {
   onToggle?: () => void;
   onSetSpeed?: (speed: number) => void;
   onDeleteRequest?: () => void;
-//   onShowChart?: () => void; // Chart để sau
+  onShowChart?: () => void; // Chart để sau
   minSpeed?: number;
   maxSpeed?: number;
 }
@@ -27,10 +27,11 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   onToggle,
   onSetSpeed,
   onDeleteRequest,
-//   onShowChart,
+   onShowChart,
   minSpeed = 0,
   maxSpeed = 100
 }) => {
+  
   const displayState = currentState ?? device.state;
   const isActuator = !isSensor;
   const isTempActuator = device.type === 'TEMP' && isActuator;
@@ -45,7 +46,12 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
      if (isTempActuator && displayState === 'ON') { return minSpeed; }
      return minSpeed;
   }, [isTempActuator, displayState, currentValue, minSpeed, maxSpeed]);
-
+  const handleChartClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    if (onShowChart) {
+        onShowChart();
+    }
+ }, [onShowChart]);
   const handleSliderChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     if (onSetSpeed) onSetSpeed(parseInt(event.target.value, 10));
   }, [onSetSpeed]);
@@ -144,6 +150,13 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
       {/* Footer - Các nút Actions */}
       <div className="flex justify-end items-center space-x-2 p-2 bg-gray-50 border-t border-gray-100">
         {/* Nút Toggle (chỉ cho Actuator) */}
+        {isSensor && onShowChart && (
+          <button 
+               onClick={handleChartClick} 
+               className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-md transition-colors duration-150" 
+               title="View Chart"> <BarChart2 size={18} /> 
+          </button> 
+        )}
         {isActuator && onToggle && (
            <button
              onClick={handleToggleClick}
@@ -159,7 +172,13 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
         )}
 
         {/* Nút Chart (chỉ cho Sensor - để sau) */}
-        {/* {isSensor && onShowChart && ( <button onClick={handleChartClick} className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-md transition-colors duration-150" title="View Chart"> <BarChart2 size={18} /> </button> )} */}
+        {isSensor && onShowChart && ( 
+          <button 
+               onClick={handleChartClick} 
+               className="p-1.5 text-gray-500 hover:bg-gray-200 rounded-md transition-colors duration-150" 
+               title="View Chart"> <BarChart2 size={18} /> 
+          </button> 
+        )} 
 
         {/* Nút Delete */}
         {onDeleteRequest && (
