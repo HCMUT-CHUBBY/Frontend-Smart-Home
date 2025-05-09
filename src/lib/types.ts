@@ -14,7 +14,11 @@ export interface Device {
   adaApikey: string | null;
   deviceConfig: Record<string, unknown>;
 }
-
+export interface PasswordDTO {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
 // Interface Device sử dụng trong Frontend (SAU KHI ĐÃ SUY LUẬN)
 // Chúng ta sẽ thêm type và isSensor vào sau khi nhận từ API
 

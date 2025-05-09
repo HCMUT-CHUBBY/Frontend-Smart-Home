@@ -31,7 +31,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   minSpeed = 0,
   maxSpeed = 100
 }) => {
-  console.log(`[DeviceCard ${device.id}] Render. Props: device.state=${device.state}, currentState=${currentState}, currentValue=${currentValue} (type: ${typeof currentValue})`);
+  //console.log(`[DeviceCard ${device.id}] Render. Props: device.state=${device.state}, currentState=${currentState}, currentValue=${currentValue} (type: ${typeof currentValue})`);
 
   const displayState = currentState ?? device.state;
   const isActuator = !isSensor;
@@ -52,7 +52,7 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
       }
       calculatedSpeed = Math.max(minSpeed, Math.min(numericValue, maxSpeed));
     }
-    console.log(`[DeviceCard ${device.id}] Calculated currentSpeed: ${calculatedSpeed} (based on currentValue: ${currentValue}, displayState: ${displayState}, isTempActuator: ${isTempActuator})`);
+   // console.log(`[DeviceCard ${device.id}] Calculated currentSpeed: ${calculatedSpeed} (based on currentValue: ${currentValue}, displayState: ${displayState}, isTempActuator: ${isTempActuator})`);
     return calculatedSpeed;
   }, [isTempActuator, displayState, currentValue, minSpeed, maxSpeed, device.id]); // Thêm device.id vào dependencies nếu cần cho log
 
