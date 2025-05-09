@@ -11,13 +11,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 import apiClient from '@/lib/apiClient';
 import {
-  DeviceFromAPI, // Kiểu dữ liệu gốc từ API
+   // Kiểu dữ liệu gốc từ API
   Device,        // Kiểu dữ liệu đã xử lý (có type, isSensor)
   DeviceDTO,
   ApiResponse
 } from '@/lib/types';
 // Giả sử các component này nằm trong thư mục components/Management
-import { processDeviceList, processDeviceData } from '@/lib/deviceUtils'; // Import hàm xử lý
+ // Import hàm xử lý
 import AddEditDeviceModal from '@/components/management/AddEditDeviceModal'; // <<< Sửa đường dẫn nếu cần
 //import DeleteConfirmationModal from '@/components/ui/ConformModal'; 
 import DeleteConfirmationModal from '@/components/management/DeleteConfirmationModal';
@@ -45,56 +45,51 @@ const deviceStateStyles: { [key: string]: { bgColor: string; textColor: string; 
 
 
 export default function ManageDevicesPage() {
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [devices, setDevices] = useState<Device[]>([]); // <<< State devices lưu kiểu Device (dữ liệu gốc từ API)
   const [filteredDevices, setFilteredDevices] = useState<Device[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // State cho Modals
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingDevice, setEditingDevice] = useState<Device | null>(null);
+  const [editingDevice, setEditingDevice] = useState<Device | null>(null); // <<< State editingDevice lưu kiểu Device
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingDeviceId, setDeletingDeviceId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-
 
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [totalPages, setTotalPages] = useState(1);
 
-
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState<string>('');
   const [filterState, setFilterState] = useState<string>('');
 
+
   const { username: defaultAdaUsername, apiKey: defaultAdaApiKey } = getDefaultAdaCredentials();
 
   
-  const fetchDevices = useCallback(async (showToast = false) => { // Thêm tham số để kiểm soát toast khi refresh
+  const fetchDevices = useCallback(async (showToast = false) => {
     setIsLoading(true);
+    if (!showToast) setIsRefreshing(false); // Chỉ set isRefreshing nếu đây không phải là manual refresh
     setError(null);
     console.log("Fetching devices...");
     try {
-      const response = await apiClient.get<ApiResponse<DeviceFromAPI[]>>('/devices');
-        if (response.data?.data) {
-            console.log("Raw devices fetched:", response.data.data);
-            // <<< THÊM BƯỚC XỬ LÝ >>>
-            const processedDevices: Device[] = processDeviceList(response.data.data);
-            console.log("Processed devices data:", processedDevices);
+      // <<< SỬA: API trả về Device[] trực tiếp >>>
+      const response = await apiClient.get<ApiResponse<Device[]>>('/devices');
+      if (response.data?.data) {
+        const apiDevices = response.data.data;
+        console.log("Devices fetched from API:", apiDevices);
 
-            setDevices(processedDevices); // <<< Lưu dữ liệu ĐÃ XỬ LÝ
-            // Apply filter dựa trên dữ liệu đã xử lý
-        // Gọi hàm applyFiltersAndSearch ở đây để đảm bảo state devices đã cập nhật
-        applyFiltersAndSearch(processedDevices, searchTerm, filterType, filterState);
+        setDevices(apiDevices); // <<< Lưu dữ liệu GỐC TỪ API
+        // applyFiltersAndSearch sẽ được gọi bởi useEffect khi `devices` thay đổi
         if (showToast) {
           toast.info("Device list refreshed!");
         }
       } else {
         console.warn("No data received from /devices endpoint");
         setDevices([]);
-        setFilteredDevices([]);
-        // Không cần apply filter nữa vì không có data
+        // setFilteredDevices([]); // applyFiltersAndSearch sẽ xử lý việc này
       }
     } catch (err: unknown) {
       console.error('Error fetching devices:', err);
@@ -102,14 +97,14 @@ export default function ManageDevicesPage() {
         || (err instanceof Error ? err.message : "Unknown error occurred.");
       setError(`Failed to load devices: ${errorMessage}`);
       setDevices([]);
-      setFilteredDevices([]);
+      // setFilteredDevices([]); // applyFiltersAndSearch sẽ xử lý
       toast.error(`Failed to load devices: ${errorMessage}`);
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false); // Luôn tắt cờ refresh ở đây
+      setIsRefreshing(false);
     }
-  
-  }, [searchTerm, filterType, filterState]); // Thêm dependencies cho useCallback
+  }, []); // Bỏ dependencies searchTerm, filterType, filterState vì applyFiltersAndSearch sẽ chạy sau
+
 
   // Fetch data lần đầu khi component mount
   useEffect(() => {
@@ -218,44 +213,42 @@ export default function ManageDevicesPage() {
     setIsModalOpen(true);
   };
 
-  const handleEditClick = useCallback(async (deviceInput: Device) => { // Nhận Device đã xử lý từ bảng
+  const handleEditClick = useCallback(async (deviceInput: Device) => {
     console.log(`Opening edit modal for device: ${deviceInput.id}`);
-    setIsLoading(true); // Có thể dùng loading riêng
+    setIsLoading(true);
     try {
-        // Fetch lại dữ liệu mới nhất từ API (trả về DeviceFromAPI)
-        const response = await apiClient.get<ApiResponse<DeviceFromAPI>>(`/devices/${deviceInput.id}`);
-        console.log("<<< Response from GET /devices/{id} for Edit:", response.data);
-        if (response.data?.data) {
-            // <<< XỬ LÝ DỮ LIỆU API TRẢ VỀ >>>
-            const processedDevice = processDeviceData(response.data.data);
+      // <<< SỬA: API trả về Device trực tiếp >>>
+      const response = await apiClient.get<ApiResponse<Device>>(`/devices/${deviceInput.id}`);
+      console.log("<<< Response from GET /devices/{id} for Edit:", response.data);
+      if (response.data?.data) {
+        const deviceFromApi = response.data.data; // Đây là kiểu Device
 
-            // Kiểm tra lại sau khi xử lý
-            if (processedDevice.type === undefined || processedDevice.isSensor === undefined) {
-                console.error(`Processed device ${processedDevice.id} is still missing 'type' or 'isSensor'! Check deviceUtils.`);
-                toast.error("Failed to process device data for editing.");
-                setIsLoading(false);
-                return;
-            }
-            console.log("<<< Data being set to editingDevice:", processedDevice);
-            setEditingDevice(processedDevice); // <<< Lưu Device ĐÃ XỬ LÝ vào state
-            setIsModalOpen(true); // Mở modal sau khi đã có dữ liệu
-        } else {
-            toast.error("Could not load device details (no data).");
+        // Kiểm tra nếu API trả về thiếu trường (phòng trường hợp backend thay đổi)
+        if (deviceFromApi.type === undefined || deviceFromApi.isSensor === undefined) {
+          console.error(`Device ${deviceFromApi.id} from API is missing 'type' or 'isSensor'!`);
+          toast.error("Failed to load device data for editing: incomplete data from server.");
+          setIsLoading(false);
+          return;
         }
+        console.log("<<< Data being set to editingDevice:", deviceFromApi);
+        setEditingDevice(deviceFromApi); // <<< Lưu Device GỐC TỪ API vào state
+        setIsModalOpen(true);
+      } else {
+        toast.error("Could not load device details (no data).");
+      }
     } catch (error: unknown) {
-         console.error(`Error fetching details for ${deviceInput.id}:`, error);
-         // ... xử lý lỗi toast ...
-         if (axios.isAxiosError(error)) {
-             toast.error(`Failed to load details: ${error.response?.data?.message || error.message}`);
-         } else if (error instanceof Error) {
-             toast.error(`Failed to load details: ${error.message}`);
-         } else {
-            toast.error("Failed to load details: Unknown error.");
-        }
+      console.error(`Error fetching details for ${deviceInput.id}:`, error);
+      if (axios.isAxiosError(error)) {
+        toast.error(`Failed to load details: ${error.response?.data?.message || error.message}`);
+      } else if (error instanceof Error) {
+        toast.error(`Failed to load details: ${error.message}`);
+      } else {
+        toast.error("Failed to load details: Unknown error.");
+      }
     } finally {
       setIsLoading(false);
     }
-}, []); // Không cần dependencies nếu chỉ dựa vào deviceInput
+  }, []);
 
   const handleDeleteClick = (deviceId: string) => {
     setDeletingDeviceId(deviceId);

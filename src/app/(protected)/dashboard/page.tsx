@@ -18,7 +18,7 @@ import ChartModalDevice from "@/components/dashboard/ChartModalDevice"; // <<< T
 import apiClient, { fetchWeather } from "@/lib/apiClient";
 import {
   // <<< SỬA: Import cả DeviceFromAPI và Device >>>
-  DeviceFromAPI,
+  
   Device, // Đây là kiểu dữ liệu ĐÃ ĐƯỢC XỬ LÝ (có type, isSensor)
   DeviceDTO,
   ApiResponse,
@@ -35,7 +35,7 @@ import {
   unsubscribeFromDevice,
   disconnectWebSocket,
 } from "@/lib/websocket";
-import { processDeviceList, processDeviceData } from "@/lib/deviceUtils";
+
 import DeviceCard from "@/components/dashboard/DeviceCard";
 import WeatherWidget from "@/components/dashboard/WeatherWidget";
 import AddEditDeviceModal from "@/components/management/AddEditDeviceModal"; // Giả sử file này ở dashboard
@@ -51,22 +51,21 @@ export default function DashboardPage() {
     status: "loading" | "authenticated" | "unauthenticated";
   };
 
-   // --- State ---
-  // <<< State devices giờ sẽ lưu kiểu Device (đã xử lý) >>>
+  // --- State ---
+  // <<< State devices giờ lưu kiểu Device (dữ liệu gốc từ API) >>>
   const [devices, setDevices] = useState<Device[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  // <<< State selectedDevice giờ sẽ lưu kiểu Device (đã xử lý) >>>
+  // <<< State selectedDevice giờ lưu kiểu Device (dữ liệu gốc từ API) >>>
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [realtimeStates, setRealtimeStates] = useState<DeviceRealtimeState>({});
   const [showDeviceModal, setShowDeviceModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'add' | 'edit' | null>(null);
+  const [modalMode, setModalMode] = useState<"add" | "edit" | null>(null);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [deviceToDelete, setDeviceToDelete] = useState<Device | null>(null);
-   // <<< THÊM: State cho Chart Modal >>>
-   const [showChartModal, setShowChartModal] = useState(false);
-   const [chartDeviceId, setChartDeviceId] = useState<string | null>(null);
- 
+  const [showChartModal, setShowChartModal] = useState(false);
+  const [chartDeviceId, setChartDeviceId] = useState<string | null>(null);
+
    // --- Refs (giữ nguyên) ---
    const clickLockRef = useRef<{ [deviceId: string]: boolean }>({});
    const subscriptionsRef = useRef<DeviceSubscriptions>({});
@@ -88,21 +87,18 @@ export default function DashboardPage() {
     setIsLoading(true);
     console.log("Fetching devices...");
     try {
-      // <<< SỬA: API trả về DeviceFromAPI[] >>>
-      const response = await apiClient.get<ApiResponse<DeviceFromAPI[]>>("/devices");
+      // <<< SỬA: API trả về Device[] trực tiếp >>>
+      const response = await apiClient.get<ApiResponse<Device[]>>("/devices");
       console.log("API Response (/devices):", response.data);
       if (response.data && response.data.data) {
-        // <<< THÊM: Xử lý dữ liệu trả về để thêm type và isSensor >>>
-        const processedDevices = processDeviceList(response.data.data);
-        console.log("Processed devices data:", processedDevices); // Log dữ liệu đã xử lý
+        const apiDevices = response.data.data;
+        console.log("Devices data from API:", apiDevices);
 
-        setDevices(processedDevices); // <<< Lưu dữ liệu ĐÃ XỬ LÝ vào state
+        setDevices(apiDevices); // <<< Lưu dữ liệu GỐC TỪ API vào state
 
-        // Cập nhật realtimeStates ban đầu
         const initialStates: DeviceRealtimeState = {};
-         // Sử dụng realtimeStatesRef để lấy giá trị mới nhất mà không gây loop
         const currentRealtimeStates = realtimeStatesRef.current;
-        processedDevices.forEach((dev) => { // Dùng mảng đã xử lý
+        apiDevices.forEach((dev) => {
           initialStates[dev.id] = { state: currentRealtimeStates[dev.id]?.state ?? dev.state };
         });
         setRealtimeStates(initialStates);
@@ -111,24 +107,21 @@ export default function DashboardPage() {
         setRealtimeStates({});
       }
     } catch (error: unknown) {
-        console.error("Error fetching devices:", error);
-        // ... (Xử lý lỗi toast như cũ) ...
-         if (axios.isAxiosError(error)) {
-             const errorMessage = error.response?.data?.message || error.message;
-             toast.error(`Failed to load devices: ${errorMessage}`);
-         } else if (error instanceof Error) {
-             toast.error(`Failed to load devices: ${error.message}`);
-         } else {
-             toast.error("Failed to load devices: Unknown error occurred.");
-         }
-        setDevices([]); // Đặt là mảng rỗng khi có lỗi
-        setRealtimeStates({});
+      console.error("Error fetching devices:", error);
+      if (axios.isAxiosError(error)) {
+        const errorMessage = error.response?.data?.message || error.message;
+        toast.error(`Failed to load devices: ${errorMessage}`);
+      } else if (error instanceof Error) {
+        toast.error(`Failed to load devices: ${error.message}`);
+      } else {
+        toast.error("Failed to load devices: Unknown error occurred.");
+      }
+      setDevices([]);
+      setRealtimeStates({});
     } finally {
       setIsLoading(false);
     }
-  // <<< Bỏ realtimeStates khỏi dependency list >>>
-  }, [status]); // Chỉ nên phụ thuộc status
-
+  }, [status]);
   const loadWeather = useCallback(async () => {
     const city = process.env.NEXT_PUBLIC_WEATHER_CITY || "Ho Chi Minh City";
 
@@ -157,63 +150,134 @@ export default function DashboardPage() {
   //   // toast.success("Device saved successfully!"); // Có thể thêm toast nếu muốn
   // };
 
-  const handleWebSocketMessage = useCallback(
-    (deviceId: string, messageBody: string) => {
-      console.log(`[WS] Received message for ${deviceId}:`, messageBody);
-      try {
-        let newState: "ON" | "OFF" | undefined = undefined;
-        let newValue: string | number | undefined = undefined;
-        let isErrorMessage = false;
+ // app/(protected)/dashboard/page.tsx
 
-        if (messageBody.startsWith("Error:")) {
-          console.error(`[WS] Backend Error for ${deviceId}: ${messageBody}`);
-          isErrorMessage = true;
-          toast.error(messageBody);
-          newValue = messageBody; // Ví dụ: hiển thị lỗi trong phần giá trị
-          newState = undefined; // Hoặc đặt state về trạng thái không xác định
-        } else {
-          try {
-            const parsedData = JSON.parse(messageBody);
-            // ... (phần parse JSON và xử lý ON/OFF/value như cũ) ...
-            if (parsedData && typeof parsedData === "object") {
-              if (
-                parsedData.state &&
-                (parsedData.state === "ON" || parsedData.state === "OFF")
-              ) {
-                newState = parsedData.state;
-              }
-              if (parsedData.value !== undefined) {
-                newValue = parsedData.value;
-              }
-            }
-          } catch {
-            if (messageBody === "ON" || messageBody === "OFF") {
-              newState = messageBody;
+// app/(protected)/dashboard/page.tsx
+
+// app/(protected)/dashboard/page.tsx
+
+const handleWebSocketMessage = useCallback(
+  (deviceId: string, messageBody: string) => {
+    console.log(`[WS] Received message for ${deviceId}: "${messageBody}"`); // Log message thô
+
+    let stateToSet: "ON" | "OFF" | undefined = undefined;
+    let valueToSet: string | number | undefined = undefined;
+    let isErrorFromServer = false; // Cờ để biết message có phải là lỗi từ server không
+
+    if (messageBody.startsWith("Error:")) {
+      console.error(`[WS] Explicit Backend Error for ${deviceId}: ${messageBody}`);
+      isErrorFromServer = true;
+      // toast.error(`Device Error: ${messageBody.substring(0, 70)}...`); // Hiển thị một phần lỗi
+      // Khi là lỗi, chúng ta có thể muốn hiển thị lỗi đó hoặc reset giá trị
+      valueToSet = messageBody; // Ví dụ: hiển thị lỗi này ở vị trí giá trị
+      stateToSet = undefined; // Hoặc có thể set một state 'ERROR' nếu có
+    } else {
+      // 1. Cố gắng parse message như một JSON object hoàn chỉnh
+      let jsonParsed = false;
+      try {
+        const parsedData = JSON.parse(messageBody);
+        jsonParsed = true; // Đánh dấu đã parse thành công (dù kết quả có thể không phải object)
+
+        if (typeof parsedData === 'object' && parsedData !== null) {
+          // Server trả về dạng {"state": "ON", "value": 32}
+          if (parsedData.state === "ON" || parsedData.state === "OFF") {
+            stateToSet = parsedData.state;
+          }
+          if (parsedData.value !== undefined) {
+            if (typeof parsedData.value === 'number' && !isNaN(parsedData.value)) {
+              valueToSet = parsedData.value;
+            } else if (typeof parsedData.value === 'string' && !isNaN(Number(parsedData.value))) {
+              valueToSet = Number(parsedData.value);
             } else {
-              newValue = isNaN(Number(messageBody))
-                ? messageBody
-                : Number(messageBody);
+              valueToSet = String(parsedData.value); // Giữ là string nếu không phải số rõ ràng
             }
           }
+        } else if (typeof parsedData === 'number' && !isNaN(parsedData)) {
+          // Server trả về dạng số thuần túy sau khi parse JSON (ví dụ, messageBody là "32")
+          valueToSet = parsedData;
+        } else if (typeof parsedData === 'string') {
+          // Server trả về dạng string thuần túy sau khi parse JSON (ví dụ, messageBody là "\"ON\"" hoặc "\"MyValue\"")
+          if (parsedData === "ON" || parsedData === "OFF") {
+            stateToSet = parsedData;
+          } else if (!isNaN(Number(parsedData))) {
+            valueToSet = Number(parsedData);
+          } else {
+            valueToSet = parsedData; // Là một string value khác
+          }
+        }
+        // Nếu sau khi parse JSON mà stateToSet và valueToSet vẫn undefined,
+        // nhưng parsedData lại là một string (ví dụ, messageBody là "\"some text\"")
+        // thì đó có thể là một value dạng string.
+        if (stateToSet === undefined && valueToSet === undefined && typeof parsedData === 'string') {
+           valueToSet = parsedData;
         }
 
-        // Cập nhật state
-        setRealtimeStates((prevStates) => ({
-          ...prevStates,
-          [deviceId]: {
-            ...prevStates[deviceId],
-            ...(newState !== undefined && { state: newState }),
-            ...(newValue !== undefined && { value: newValue }), // Cập nhật cả state và value
-            // Nếu là lỗi, có thể muốn ghi đè state cũ
-            ...(isErrorMessage && { state: undefined }), // Ví dụ: Xóa state nếu có lỗi
-          },
-        }));
-      } catch (error) {
-        console.error(`[WS] Error processing message for ${deviceId}:`, error);
+      } catch  {
+        // JSON.parse thất bại -> messageBody không phải là JSON hợp lệ.
+        jsonParsed = false; // Đảm bảo cờ này đúng
       }
-    },
-    []
-  );
+
+      // 2. Nếu không parse được JSON hoặc parse JSON mà không ra state/value cụ thể,
+      //    thì xử lý messageBody như text thuần.
+      if (!jsonParsed || (stateToSet === undefined && valueToSet === undefined && !isErrorFromServer)) {
+        if (messageBody === "ON" || messageBody === "OFF") {
+          stateToSet = messageBody;
+        } else if (!isNaN(Number(messageBody))) { // Kiểm tra messageBody có phải là chuỗi số không (ví dụ "32")
+          valueToSet = Number(messageBody);
+        } else {
+          // Không phải ON/OFF, không phải số -> coi là một value dạng string không xác định
+          // Hoặc có thể là một thông báo text từ server mà không phải lỗi
+          console.warn(`[WS] Message for ${deviceId} is not standard state/value/JSON. Treating as string value: "${messageBody}"`);
+          valueToSet = messageBody; 
+        }
+      }
+    }
+
+    // Chỉ cập nhật state nếu có gì đó thực sự thay đổi hoặc là thông báo lỗi
+    if (stateToSet !== undefined || valueToSet !== undefined || isErrorFromServer) {
+      console.log(`[WS] PRE-UPDATE CHECK for ${deviceId}: Current realtimeState.value is "${realtimeStatesRef.current[deviceId]?.value}", Current realtimeState.state is "${realtimeStatesRef.current[deviceId]?.state}"`);
+      console.log(`[WS] ATTEMPTING UPDATE for ${deviceId}: Determined stateToSet="${stateToSet}", Determined valueToSet="${valueToSet}" (type: ${typeof valueToSet}), isErrorFromServer=${isErrorFromServer}`);
+      
+      setRealtimeStates((prevStates) => {
+        const currentDeviceData = prevStates[deviceId] || {};
+        const updatedDeviceData = { ...currentDeviceData };
+
+        if (isErrorFromServer) {
+          // Ghi đè với thông tin lỗi
+          updatedDeviceData.value = valueToSet; // valueToSet lúc này là chuỗi lỗi
+          // updatedDeviceData.state = 'ERROR'; // Hoặc một giá trị state báo lỗi nếu bạn có
+        } else {
+          // Cập nhật bình thường
+          if (stateToSet !== undefined) {
+            updatedDeviceData.state = stateToSet;
+          }
+          if (valueToSet !== undefined) {
+            updatedDeviceData.value = valueToSet;
+          }
+        }
+        
+        console.log(`[WS] INSIDE setRealtimeStates for ${deviceId}. Prev device data:`, JSON.stringify(currentDeviceData), `New device data:`, JSON.stringify(updatedDeviceData));
+        
+        return {
+          ...prevStates,
+          [deviceId]: updatedDeviceData,
+        };
+      });
+    } else {
+      console.warn(`[WS] No actionable state/value determined for ${deviceId} from message: "${messageBody}"`);
+    }
+  },
+  [] 
+);
+
+useEffect(() => {
+  console.log("[DashboardPage Effect] realtimeStates changed:", JSON.stringify(realtimeStates));
+  // Nếu bạn muốn xem chi tiết một device cụ thể:
+  const testDeviceId = "DEVICE_TEMP_011"; // Thay bằng ID bạn đang test
+  if (realtimeStates[testDeviceId]) {
+    console.log(`[DashboardPage Effect] ${testDeviceId} in realtimeStates:`, JSON.stringify(realtimeStates[testDeviceId]));
+  }
+}, [realtimeStates]);
 
   const setupWebSocket = useCallback(() => {
     if (
@@ -321,27 +385,26 @@ export default function DashboardPage() {
     console.log(`Opening modal in 'edit' mode for device: ${device.id}`);
     setIsLoading(true);
     try {
-      // Fetch lại để lấy dữ liệu mới nhất, nhưng API trả về DeviceFromAPI
-      const response = await apiClient.get<ApiResponse<DeviceFromAPI>>(`/devices/${device.id}`);
-       console.log("<<< Response from GET /devices/{id} for Edit:", response.data);
+      // <<< SỬA: API trả về Device trực tiếp >>>
+      const response = await apiClient.get<ApiResponse<Device>>(`/devices/${device.id}`);
+      console.log("<<< Response from GET /devices/{id} for Edit:", response.data);
       if (response.data?.data) {
-        // <<< THÊM: Xử lý dữ liệu API trả về >>>
-        const processedDevice = processDeviceData(response.data.data);
-         // Kiểm tra lại sau khi xử lý
-         if (processedDevice.type === undefined || processedDevice.isSensor === undefined) {
-             console.error(`Processed device ${processedDevice.id} is still missing 'type' or 'isSensor'! Check deviceUtils.`);
-             toast.error("Failed to process device data for editing.");
-             setIsLoading(false);
-             return;
-         }
+        const deviceFromApi = response.data.data; // Đây là kiểu Device
+
+        // Kiểm tra nếu API trả về thiếu trường (phòng trường hợp backend thay đổi mà frontend chưa biết)
+        if (deviceFromApi.type === undefined || deviceFromApi.isSensor === undefined) {
+            console.error(`Device ${deviceFromApi.id} from API is missing 'type' or 'isSensor'!`);
+            toast.error("Failed to load device data for editing: incomplete data from server.");
+            setIsLoading(false);
+            return;
+        }
 
         const detailedDevice = {
-          ...processedDevice, // <<< Dùng dữ liệu ĐÃ XỬ LÝ
-          // Ưu tiên state realtime
-          state: realtimeStatesRef.current[device.id]?.state ?? processedDevice.state,
+          ...deviceFromApi, // <<< Dùng dữ liệu GỐC TỪ API
+          state: realtimeStatesRef.current[device.id]?.state ?? deviceFromApi.state,
         };
-         console.log("<<< Data being set to selectedDevice for Edit:", detailedDevice);
-        setSelectedDevice(detailedDevice); // <<< selectedDevice giờ là kiểu Device đầy đủ
+        console.log("<<< Data being set to selectedDevice for Edit:", detailedDevice);
+        setSelectedDevice(detailedDevice);
         setModalMode('edit');
         setShowDeviceModal(true);
       } else {
@@ -537,29 +600,56 @@ const handleDeviceUpdate = useCallback((updatedDeviceData: Device) => { // Nhậ
       }));
     }
   };
+
+
   const handleSetSpeed = useCallback((device: Device, speed: number) => {
     if (!session) {
       toast.warn("Authentication required.");
       return;
     }
-    // Có thể thêm kiểm tra min/max speed từ device.deviceConfig nếu muốn
-    const speedValue = String(Math.round(speed)); // Gửi dạng string, làm tròn
+    const speedValue = String(Math.round(speed));
+    const deviceId = device.id;
+
+    console.log(`[handleSetSpeed] Device: ${deviceId}, Requested Speed: ${speedValue}`);
+    console.log(`[handleSetSpeed] BEFORE optimistic update, realtimeStatesRef.current[${deviceId}]:`, JSON.stringify(realtimeStatesRef.current[deviceId]));
+
+    const oldSpeed = realtimeStatesRef.current[deviceId]?.value; 
+
+    setRealtimeStates((prevStates) => {
+      const newStateForDevice = {
+        // Giữ lại state ON/OFF hiện tại, hoặc state mặc định của device nếu chưa có
+        state: prevStates[deviceId]?.state ?? device.state, 
+        value: speedValue, // Cập nhật giá trị speed mới ngay lập tức
+      };
+      console.log(`[handleSetSpeed] INSIDE setRealtimeStates (Optimistic). Updating ${deviceId} to:`, JSON.stringify(newStateForDevice));
+      return {
+        ...prevStates,
+        [deviceId]: newStateForDevice,
+      };
+    });
 
     const command: DeviceCommand = { action: "SET_SPEED", value: speedValue };
-    console.log(`[WS] Sending SET_SPEED to ${device.id}:`, command);
+    console.log(`[handleSetSpeed] Publishing command for ${deviceId}:`, command);
     try {
-      publishToDevice(device.id, command);
-       // Không cần optimistic update ở đây, giá trị sẽ cập nhật khi WS trả về
-       // Có thể thêm toast nhẹ nhàng thông báo lệnh đã gửi
-       toast.info(`Sent speed command (${speedValue}%) to ${device.feed}`);
+      publishToDevice(deviceId, command);
     } catch (wsError) {
-      console.error(`[WS] Error publishing SET_SPEED for ${device.id}:`, wsError);
+      console.error(`[handleSetSpeed] Error publishing SET_SPEED for ${deviceId}:`, wsError);
       toast.error(
         `Failed to send speed command to device ${device.feed}. Check connection.`
       );
+      setRealtimeStates((prevStates) => {
+        const revertedStateForDevice = {
+          state: prevStates[deviceId]?.state ?? device.state,
+          value: oldSpeed, 
+        };
+        console.log(`[handleSetSpeed] INSIDE setRealtimeStates (Rollback). Reverting ${deviceId} to:`, JSON.stringify(revertedStateForDevice));
+        return {
+          ...prevStates,
+          [deviceId]: revertedStateForDevice,
+        };
+      });
     }
-  }, [session]); // Phụ thuộc vào session
-
+  }, [session, devices]); // `devices` có thể cần thiết nếu `device.state` thay đổi và bạn muốn giá trị mặc định mới nhất
   
   
 

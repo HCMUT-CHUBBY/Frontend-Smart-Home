@@ -31,21 +31,32 @@ const DeviceCard: React.FC<DeviceCardProps> = ({
   minSpeed = 0,
   maxSpeed = 100
 }) => {
-  
+  console.log(`[DeviceCard ${device.id}] Render. Props: device.state=${device.state}, currentState=${currentState}, currentValue=${currentValue} (type: ${typeof currentValue})`);
+
   const displayState = currentState ?? device.state;
   const isActuator = !isSensor;
   const isTempActuator = device.type === 'TEMP' && isActuator;
 
   const Icon = device.type === 'TEMP' ? Thermometer : Lightbulb;
 
+  // components/dashboard/DeviceCard.tsx
   const currentSpeed = useMemo(() => {
-    // ... (logic tính currentSpeed giữ nguyên) ...
-     if (isTempActuator && displayState === 'ON' && typeof currentValue === 'number') {
-       return Math.max(minSpeed, Math.min(currentValue, maxSpeed));
-     }
-     if (isTempActuator && displayState === 'ON') { return minSpeed; }
-     return minSpeed;
-  }, [isTempActuator, displayState, currentValue, minSpeed, maxSpeed]);
+    let calculatedSpeed = minSpeed; // Giá trị mặc định nếu OFF hoặc không phải temp actuator
+    if (isTempActuator && displayState === 'ON') {
+      let numericValue = minSpeed; 
+      if (currentValue !== undefined && currentValue !== null && String(currentValue).trim() !== "") {
+        const parsed = parseFloat(String(currentValue)); 
+        if (!isNaN(parsed)) {
+          numericValue = parsed;
+        }
+      }
+      calculatedSpeed = Math.max(minSpeed, Math.min(numericValue, maxSpeed));
+    }
+    console.log(`[DeviceCard ${device.id}] Calculated currentSpeed: ${calculatedSpeed} (based on currentValue: ${currentValue}, displayState: ${displayState}, isTempActuator: ${isTempActuator})`);
+    return calculatedSpeed;
+  }, [isTempActuator, displayState, currentValue, minSpeed, maxSpeed, device.id]); // Thêm device.id vào dependencies nếu cần cho log
+
+
   const handleChartClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
     if (onShowChart) {
