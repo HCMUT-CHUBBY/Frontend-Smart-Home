@@ -129,9 +129,9 @@ export default function HistoryPage() {
   };
 
   const getDeviceFeed = (deviceId: string): string => {
-    const device = devices.find(d => d.id === deviceId);
-    return device?.feed || deviceId;
-  };
+  const device = devices.find(d => d.id === deviceId);
+  return device?.feed || deviceId; // Nếu tìm thấy device và device.feed có giá trị, dùng nó. Nếu không, dùng deviceId.
+};
   
   const formatDate = (dateString: string) => {
     if (!dateString) return 'N/A';
@@ -249,8 +249,8 @@ export default function HistoryPage() {
                 <tr key={`${log.deviceId}-${log.dateTime}-${index}`} className="hover:bg-gray-50">
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">{formatDate(log.dateTime)}</td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium" title={log.deviceId}>
-                    {getDeviceFeed(log.deviceId)}
-                  </td>
+        {log.deviceId} {/* Hiển thị trực tiếp ID đầy đủ của thiết bị từ log */}
+      </td>
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     {log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''} (${log.user.email})` : 'N/A'}
                   </td>
