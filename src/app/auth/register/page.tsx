@@ -1,11 +1,15 @@
 "use client";
-import ForwardIcon from '@/assests/forward.svg';
+import ForwardIcon from '@/assests/forward.svg'; // Kiểm tra lại đường dẫn 'assests' -> 'assets' nếu cần
 import { useState, FormEvent } from "react";
+// Bỏ import axios trực tiếp nếu bạn chỉ dùng apiClient cho request này
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import LogoLight from '@/assests/illumination.svg';
+import LogoLight from '@/assests/illumination.svg'; // Kiểm tra lại đường dẫn
+
+// Import apiClient của bạn
+import apiClient from '@/lib/apiClient'; // <<<< THÊM DÒNG NÀY (điều chỉnh đường dẫn nếu cần)
 
 export default function SignUp() {
   const [username, setUsername] = useState("");
@@ -21,9 +25,7 @@ export default function SignUp() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    // Basic validation
     if (password !== confirmPassword) {
-      // Translated error message
       setError("Passwords do not match. Please check again.");
       return;
     }
@@ -32,8 +34,7 @@ export default function SignUp() {
     setIsLoading(true);
 
     try {
-      // Ensure the API endpoint is correct
-      const response = await axios.post("http://localhost:8080/api/v1/auth/register", {
+      const response = await apiClient.post("/auth/register", {
         username,
         password,
         firstName,
@@ -41,30 +42,54 @@ export default function SignUp() {
         phoneNumber,
       });
 
-      // Check backend response carefully (adjust if needed)
-      if (response.data === "User registered successfully") {
+      if (response.status === 200 || response.status === 201 || response.data === "User registered successfully") {
         router.push("/auth/login");
       } else {
-        // Handle other potential success messages or scenarios if needed
-        console.log("Registration response:", response.data);
-        // Optionally, show a success message before redirecting
-        // toast.success("Registration successful! Redirecting to login...");
-        router.push("/auth/login");
+        console.log("Registration response (unexpected):", response.data);
+        setError(response.data?.message || response.data?.toString() || "Registration successful, but unexpected response.");
       }
-    } catch (error: unknown) {
-      // Translated error messages
-      if (axios.isAxiosError(error) && error.response) {
-        setError(`Sign up failed. ${error.response.data?.message || error.response.data}`); // Try to get message field first
-      } else if (error instanceof Error) {
-        setError(`Sign up failed. ${error.message}`);
-      } else {
-        setError("Sign up failed. An unknown error occurred.");
+    } catch (err: unknown) { // err là 'unknown' là đúng theo TypeScript hiện đại
+      console.error("Sign up error details:", err);
+      let errorMessage = "Sign up failed. An unknown error occurred.";
+
+      // SỬA Ở ĐÂY: Dùng axios.isAxiosError(err)
+      if (axios.isAxiosError(err)) { // <<<< THAY ĐỔI Ở ĐÂY
+        // Sau khi kiểm tra này, TypeScript sẽ biết err là một AxiosError trong khối if này
+        if (err.response) {
+          const responseData = err.response.data;
+          if (typeof responseData === 'string') {
+            errorMessage = responseData;
+          } else if (responseData && typeof responseData.message === 'string') {
+            errorMessage = responseData.message;
+          } else if (responseData && typeof responseData.errorMessage === 'string') {
+            errorMessage = responseData.errorMessage;
+          } else if (responseData && responseData.errors && typeof responseData.errors === 'object' && !Array.isArray(responseData.errors)) {
+            const errorKeys = Object.keys(responseData.errors);
+            if (errorKeys.length > 0) {
+                 // Lấy message của lỗi đầu tiên trong object errors
+                const firstErrorKey = errorKeys[0];
+                const errorValue = (responseData.errors as Record<string, string>)[firstErrorKey];
+                errorMessage = typeof errorValue === 'string' ? errorValue : "Validation failed.";
+            } else {
+                errorMessage = "Validation failed with multiple unspecified errors.";
+            }
+          } else {
+            errorMessage = `Server error: ${err.response.status}`;
+          }
+          setError(`Sign up failed. ${errorMessage}`);
+        } else if (err.request) {
+          setError("Sign up failed. No response from server. Check your network or contact support.");
+        } else {
+          setError(`Sign up failed. Error setting up request: ${err.message}`);
+        }
+      } else if (err instanceof Error) { // Kiểm tra nếu là một Error thông thường
+        setError(`Sign up failed. ${err.message}`);
       }
+      // setIsLoading(false) đã có trong finally
     } finally {
       setIsLoading(false);
     }
   };
-
   return (
     // Main container with dark background and relative positioning
     <div className="min-h-screen bg-gray-700 flex flex-col text-white overflow-hidden relative">

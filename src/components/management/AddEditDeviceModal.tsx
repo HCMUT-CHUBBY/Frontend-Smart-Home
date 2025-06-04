@@ -133,10 +133,17 @@ const AddEditDeviceModal: React.FC<AddEditDeviceModalProps> = ({
         setError("Light Threshold is required for this Light device.");
         return false;
       }
-      if (isNaN(Number(lightThresholdValue))) {
+      const numericLightThreshold = Number(lightThresholdValue);
+      if (isNaN(numericLightThreshold)) {
         setError("Light Threshold must be a valid number.");
         return false;
       }
+      // === THÊM KIỂM TRA GIỚI HẠN CHO light_threshold ===
+      if (numericLightThreshold < 0 || numericLightThreshold > 100) { // Ví dụ: giới hạn từ 0 đến 100
+        setError("Light Threshold must be between 0 and 100.");
+        return false;
+      }
+      // === KẾT THÚC THÊM KIỂM TRA ===
     }
     
     if (deviceCategory === 'TEMP_SENSOR' || deviceCategory === 'TEMP_ACTUATOR') {
@@ -165,16 +172,9 @@ const AddEditDeviceModal: React.FC<AddEditDeviceModalProps> = ({
         }
     }
     
-    // <<< BỎ: Validate cho minSpeed, maxSpeed, threshold của TEMP_ACTUATOR >>>
-    // if (deviceCategory === 'TEMP_ACTUATOR') {
-    //     if (configMinSpeed !== '' && configMaxSpeed !== '' && Number(configMinSpeed) >= Number(configMaxSpeed)) {
-    //         setError("Min Speed must be less than Max Speed for Temp Actuator.");
-    //         return false;
-    //     }
-    // }
-
     return true;
   };
+  // >>> KẾT THÚC CHỈNH SỬA (Hàm validateForm) <<<
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

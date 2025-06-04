@@ -270,14 +270,7 @@ const handleWebSocketMessage = useCallback(
   [] 
 );
 
-useEffect(() => {
-  console.log("[DashboardPage Effect] realtimeStates changed:", JSON.stringify(realtimeStates));
-  // Nếu bạn muốn xem chi tiết một device cụ thể:
-  const testDeviceId = "DEVICE_TEMP_011"; // Thay bằng ID bạn đang test
-  if (realtimeStates[testDeviceId]) {
-    console.log(`[DashboardPage Effect] ${testDeviceId} in realtimeStates:`, JSON.stringify(realtimeStates[testDeviceId]));
-  }
-}, [realtimeStates]);
+
 
   const setupWebSocket = useCallback(() => {
     if (
