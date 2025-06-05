@@ -122,6 +122,7 @@ const AddEditDeviceModal: React.FC<AddEditDeviceModalProps> = ({
     if (!feed.trim()) { setError("Feed name is required"); return false; }
     if (!adaUsername.trim()) { setError("Adafruit Username is required"); return false; }
     
+    // Khi thêm mới, API Key là bắt buộc
     if (mode === 'add' && !adaApiKey.trim()) {
       setError("Adafruit API Key is required for new device");
       return false;
@@ -212,17 +213,28 @@ const AddEditDeviceModal: React.FC<AddEditDeviceModalProps> = ({
       // }
     }
 
-    const deviceDataPayload: DeviceDTO = {
+    // const deviceDataPayload: DeviceDTO = {
+    //   ...(isEditing && initialData && { id: initialData.id }),
+    //   feed: feed.trim(),
+    //   type: type,
+    //   isSensor: isSensor,
+    //   state: (mode === 'add' && !isSensor) ? configInitialState : (initialData?.state || 'OFF'),
+    //   adaUsername: adaUsername.trim(),
+    //   ...(adaApiKey.trim() && { adaApikey: adaApiKey.trim() }),
+    //   deviceConfig: finalDeviceConfig,
+    // };
+   const deviceDataPayload: DeviceDTO = {
       ...(isEditing && initialData && { id: initialData.id }),
       feed: feed.trim(),
       type: type,
       isSensor: isSensor,
       state: (mode === 'add' && !isSensor) ? configInitialState : (initialData?.state || 'OFF'),
       adaUsername: adaUsername.trim(),
-      ...(adaApiKey.trim() && { adaApikey: adaApiKey.trim() }),
+      adaApikey: adaApiKey.trim() ? adaApiKey.trim() : defaultAdaApiKey.trim(),
+      // Corrected logic:
+      //...( (mode === 'add' || (isEditing && adaApiKey.trim())) ? { adaApikey: adaApiKey.trim() } : {} ),
       deviceConfig: finalDeviceConfig,
     };
-
     console.log("Payload to be sent:", deviceDataPayload);
 
     try {

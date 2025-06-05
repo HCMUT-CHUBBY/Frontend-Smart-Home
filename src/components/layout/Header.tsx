@@ -6,19 +6,13 @@ import styles from '@/styles/header.module.scss'; // <<< THÊM DÒNG IMPORT NÀY
 const Header = () => {
   const { data: session } = useSession();
 
-  const getUsername = () => {
-    if (session?.user) {
-      return session.user.name || 'User';
-    }
-    return 'User';
-  }
-
+  
   return (
     // Sử dụng class từ header.module.scss
     <header className={styles.header}> {/* <<< THAY CLASSNAME */}
       {/* Chào mừng người dùng */}
       <h1 className={styles.title}> {/* <<< THAY CLASSNAME */}
-        Hi, {getUsername()}
+        Hi,  {session?.user?.name || session?.user?.email || sessionStorage.getItem("username") || "Guest"}
       </h1>
 
       {/* Các thành phần khác (Search, Notifications,...) */}
