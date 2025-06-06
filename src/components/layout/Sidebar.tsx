@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut, useSession } from "next-auth/react";
-import { Home, Settings, List, LogOut, User } from "lucide-react";
+import { Home, Settings, List, LogOut, User, History} from "lucide-react";
 import styles from "@/styles/sidebar.module.scss";
 
 const Sidebar = () => {
@@ -14,6 +14,7 @@ const Sidebar = () => {
   const menuItems = [
     { href: "/dashboard", label: "Dashboard", icon: Home },
     { href: "/manage-devices", label: "Manage Devices", icon: List },
+    {href: "/history", label: "History", icon: History },
     { href: "/settings", label: "Settings", icon: Settings },
   ];
 

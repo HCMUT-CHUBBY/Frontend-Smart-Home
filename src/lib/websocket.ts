@@ -4,7 +4,7 @@ import { Client, StompSubscription } from "@stomp/stompjs";
 
 let stompClient: Client | null = null;
 
-const socketUrl = "ws://localhost:8080/ws/sensor";
+const socketUrl = "wss://localhost:8080/ws/sensor";
 
 export const connectWebSocket = (
   token: string,

@@ -4,23 +4,24 @@ import { StompSubscription } from "@stomp/stompjs";
 
 // --- SỬA INTERFACE Device ---
 // Interface này đại diện cho dữ liệu NHẬN ĐƯỢC từ API GET
-export interface DeviceFromAPI {
+export interface Device {
   id: string;
   feed: string;
   state: "ON" | "OFF";
-  // type: "TEMP" | "LIGHT"; // <<< Bỏ đi
-  // isSensor: boolean;      // <<< Bỏ đi
+  type: "TEMP" | "LIGHT"; // <<< Bỏ đi
+  isSensor: boolean;      // <<< Bỏ đi
   adaUsername: string;
   adaApikey: string | null;
   deviceConfig: Record<string, unknown>;
 }
-
+export interface PasswordDTO {
+  oldPassword: string;
+  newPassword: string;
+  confirmPassword: string;
+}
 // Interface Device sử dụng trong Frontend (SAU KHI ĐÃ SUY LUẬN)
 // Chúng ta sẽ thêm type và isSensor vào sau khi nhận từ API
-export interface Device extends DeviceFromAPI {
-    type: "TEMP" | "LIGHT"; // Kiểu suy luận được
-    isSensor: boolean;      // Trạng thái suy luận được
-}
+
 export interface UserDTO {
   id: number; // Hoặc Long nếu backend dùng Long
   email: string;
