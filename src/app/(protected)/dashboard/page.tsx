@@ -802,12 +802,13 @@ const handleDeviceUpdate = useCallback((updatedDeviceData: Device) => { // Nhậ
       <div className={styles.widgetsGrid}>
         {" "}
         {/* Lưới widgets */}
-        <div className={styles.widgetColSpan1}>
-          {" "}
-          {/* Ví dụ widget chiếm 1 cột */}
-          <WeatherWidget weather={weather} />{" "}
-          {/* Cần style WeatherWidget.module.scss */}
-        </div>
+       <div className={styles.widgetColSpan1}>
+            <WeatherWidget 
+              weather={weather}
+              isLoading={isLoading} // Dùng chung trạng thái loading của trang
+              onRefresh={loadWeather} // Cho phép widget gọi lại hàm loadWeather
+            />
+          </div>
         <div
           className={`${styles.widgetColSpan2} ${styles.videoWidgetContainer}`}
         >
@@ -890,7 +891,7 @@ const handleDeviceUpdate = useCallback((updatedDeviceData: Device) => { // Nhậ
         {/* === KẾT THÚC WIDGET VIDEO === */}
       </div>
       {/* Phần danh sách thiết bị */}
-      <h2 className={styles.deviceListTitle}>Thiết bị của tôi</h2>
+      <h2 className={styles.deviceListTitle}>My devices</h2>
       {/* Lưới thiết bị hoặc thông báo khi không có thiết bị */}
       <div className={styles.deviceGrid}>
         {devices.length === 0 && (
@@ -919,7 +920,8 @@ const handleDeviceUpdate = useCallback((updatedDeviceData: Device) => { // Nhậ
                 onClick={() => openEditModal(device)}
                 onSetSpeed={isTempActuator ? (speed) => handleSetSpeed(device, speed) : undefined}
                 onDeleteRequest={() => openConfirmDeleteModal(device)}
-                onShowChart={isSensor ? () => handleShowChart(device.id) : undefined} // <<< TRUYỀN PROP MỚI
+                onShowChart={() => handleShowChart(device.id)}
+                //onShowChart={isSensor ? () => handleShowChart(device.id) : undefined} // <<< TRUYỀN PROP MỚI
                 minSpeed={isTempActuator ? Number(device.deviceConfig?.['minSpeed'] ?? 0) : undefined}
                 maxSpeed={isTempActuator ? Number(device.deviceConfig?.['maxSpeed'] ?? 100) : undefined}
               />

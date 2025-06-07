@@ -1,439 +1,478 @@
-// app/(protected)/settings/page.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react'; // Import signOut if needed later
+import React, { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
-import { User, Key, Palette, Save, Loader2 } from 'lucide-react'; // Icons
-import { motion } from 'framer-motion';
-import axios from 'axios'; // Import axios to check for AxiosError
+import { 
+  Loader2, 
+  Eye, 
+  EyeOff, 
+  Shield, 
+  CheckCircle, 
+  XCircle,
+  Zap,
+  Sparkles
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
 
-import apiClient from '@/lib/apiClient'; // Your API Client
-// Import các DTO mới và CustomSession
-import {  PasswordDTO, ProfileUpdateDTO, PreferencesUpdateDTO } from '@/lib/types';
+import apiClient from '@/lib/apiClient';
+import { PasswordDTO } from '@/lib/types';
 
-// SettingsCard Component (Keep as is or use your UI library component)
-const SettingsCard: React.FC<{ title: string; icon: React.ReactNode; children: React.ReactNode }> = ({ title, icon, children }) => (
-    <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        // Use dark mode classes from Tailwind
-        className="bg-white dark:bg-gray-800 rounded-xl shadow-lg overflow-hidden"
-    >
-        <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center space-x-3 bg-gray-50 dark:bg-gray-700/50">
-            {/* Adjust icon color for dark mode if needed */}
-            <div className="text-indigo-600 dark:text-indigo-400">{icon}</div>
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100">{title}</h2>
-        </div>
-        <div className="p-6 space-y-4">
-            {children}
-        </div>
-    </motion.div>
-);
-
-// SettingsInput Component (Keep as is or use your UI library component)
-const SettingsInput: React.FC<{ label: string; id: string; type?: string; value: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void; disabled?: boolean; required?: boolean; placeholder?: string }> =
-    ({ label, id, type = "text", value, onChange, disabled = false, required = false, placeholder }) => (
-    <div>
-        <label htmlFor={id} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-            {label} {required && <span className="text-red-500">*</span>}
-        </label>
-        <input
-            type={type}
-            id={id}
-            name={id}
-            value={value}
-            onChange={onChange}
-            disabled={disabled}
-            required={required}
-            placeholder={placeholder}
-            // Add dark mode styles for input
-            className="block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 disabled:bg-gray-100 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition duration-150 placeholder-gray-400 dark:placeholder-gray-500"
-        />
-    </div>
-);
-
-export default function SettingsPage() {
-    const { data: session, status, update } = useSession() ; // Add update function from useSession
-
-    // --- State ---
-    const [profileData, setProfileData] = useState({ name: '', email: '' });
-    const [passwordData, setPasswordData] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
-    const [preferences, setPreferences] = useState({ theme: 'light', emailNotifications: true });
-
-    const [isSavingProfile, setIsSavingProfile] = useState(false);
-    const [isChangingPassword, setIsChangingPassword] = useState(false);
-    const [isSavingPrefs, setIsSavingPrefs] = useState(false);
-
-    // Load user data and preferences
-    useEffect(() => {
-        if (session?.user) {
-            setProfileData({
-                name: session.user.name || '',
-                email: session.user.email || '',
-            });
-            // --- TODO: Fetch user preferences from API if they exist ---
-            // Example:
-            // const fetchPrefs = async () => {
-            //     try {
-            //         const response = await apiClient.get('/user/preferences');
-            //         if (response.data?.data) {
-            //              setPreferences(response.data.data);
-            //              applyTheme(response.data.data.theme || 'light');
-            //          }
-            //      } catch (error) { console.error("Failed to fetch preferences", error); }
-            // };
-            // fetchPrefs();
-
-             // Fallback to localStorage theme if no API pref found yet
-             const savedTheme = localStorage.getItem('theme') || 'light';
-             setPreferences(prev => ({ ...prev, theme: savedTheme }));
-             applyTheme(savedTheme);
-
-        } else {
-            // Handle no session? Might redirect elsewhere.
-            // Apply default theme if no session
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            applyTheme(savedTheme);
-        }
-
-    }, [session]);
-
-    // --- Handlers ---
-    const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setProfileData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setPasswordData(prev => ({ ...prev, [name]: value }));
-    };
-
-     const handleNotificationChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, checked } = e.target;
-        setPreferences(prev => ({ ...prev, [name]: checked }));
-     };
-
-
-    // --- Theme Handling ---
-    const applyTheme = (themeName: string) => {
-        if (themeName === 'dark') {
-            document.documentElement.classList.add('dark');
-        } else {
-            document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('theme', themeName); // Save preference locally
-    };
-
-    const handleThemeChange = (themeName: string) => {
-        setPreferences(prev => ({ ...prev, theme: themeName }));
-        applyTheme(themeName);
-        // Optionally trigger save preferences immediately or rely on save button
-        // handleSavePreferences();
-    };
-
-    // --- API Submit Functions ---
-
-    const handleSaveProfile = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!profileData.name.trim()) {
-             toast.error("Display Name cannot be empty.");
-             return;
-        }
-        setIsSavingProfile(true);
-        console.log("Saving profile data:", { name: profileData.name }); // Don't log email if not changing
-
-        try {
-            // --- TODO: Replace with your actual API endpoint ---
-            const payload: ProfileUpdateDTO = { name: profileData.name };
-            await apiClient.put('/user/profile', payload); // <<<< ASSUMED API CALL
-
-            toast.success("Profile updated successfully!");
-
-            // Update the session data if possible (useful if name is used elsewhere immediately)
-            await update({ name: profileData.name }); // Update next-auth session
-
-        } catch (err: unknown) {
-            console.error("Error saving profile:", err);
-             const errorMessage = axios.isAxiosError(err) && err.response?.data
-                 ? (err.response.data.errorMessage || err.response.data.message || JSON.stringify(err.response.data))
-                 : (err instanceof Error ? err.message : "An unknown error occurred.");
-            toast.error(`Failed to update profile: ${errorMessage}`);
-        } finally {
-            setIsSavingProfile(false);
-        }
-    };
-
-    // app/(protected)/settings/page.tsx
-
-// ... imports và các state khác ...
-
-const handleChangePassword = async (e: React.FormEvent) => {
-  e.preventDefault();
-  // --- Giữ nguyên phần validation phía client ---
-  if (passwordData.newPassword !== passwordData.confirmPassword) {
-      toast.error("New password and confirmation password do not match.");
-      return;
-  }
-  if (passwordData.newPassword.length < 6) {
-      toast.error("New password must be at least 6 characters long.");
-      return;
-  }
-  // Giữ lại kiểm tra này vì backend cũng yêu cầu oldPassword (currentPassword)
-  if (!passwordData.currentPassword) {
-      toast.error("Current password is required.");
-      return;
-  }
-   // Thêm kiểm tra confirmPassword (mặc dù đã so sánh ở trên, nhưng để chắc chắn không rỗng nếu backend yêu cầu)
-   if (!passwordData.confirmPassword) {
-      toast.error("Confirm password is required."); // Thêm thông báo này nếu cần
-      return;
-  }
-
-
-  setIsChangingPassword(true);
-
-  // --- Sửa lại Payload ---
-  const payload: PasswordDTO = {
-      oldPassword: passwordData.currentPassword, // <<< Gửi giá trị state 'currentPassword' với key là 'oldPassword'
-      newPassword: passwordData.newPassword,
-      confirmPassword: passwordData.confirmPassword // <<< Thêm trường confirmPassword vào payload
-  };
-  // -----------------------
-
-  console.log("Attempting to change password..."); // Log trước khi gọi API
-
-  try {
-      const response = await apiClient.put('/user/password', payload); // Gọi API với payload đã sửa
-
-      toast.success(response.data?.message || "Password changed successfully!");
-      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' }); // Reset form
-
-  } catch (err: unknown) {
-      console.error("Error changing password:", err);
-
-      let errorMessage = "An unknown error occurred.";
-      // Cố gắng lấy lỗi chi tiết hơn từ response 400
-      if (axios.isAxiosError(err) && err.response?.data) {
-          const errorData = err.response.data;
-          if (errorData.errors && typeof errorData.errors === 'object') {
-              // Nếu có object 'errors', nối các thông báo lỗi lại
-              errorMessage = Object.values(errorData.errors).join('. ');
-          } else {
-              // Nếu không, lấy message chung
-              errorMessage = errorData.errorMessage || errorData.message || `Request failed with status ${err.response.status}`;
-          }
-      } else if (err instanceof Error) {
-          errorMessage = err.message;
-      }
-
-      toast.error(`Failed to change password: ${errorMessage}`);
-  } finally {
-      setIsChangingPassword(false);
-  }
+// Enhanced Toast Configuration
+const toastConfig = {
+  position: "top-right" as const,
+  autoClose: 5000,
+  hideProgressBar: false,
+  closeOnClick: true,
+  pauseOnHover: true,
+  draggable: true,
+  progress: undefined,
+  theme: "colored" as const,
+  toastClassName: "!rounded-2xl !shadow-2xl",
+  bodyClassName: "!font-medium"
 };
 
-// ... phần còn lại của component ...
-
-    const handleSavePreferences = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsSavingPrefs(true);
-        console.log("Saving preferences:", preferences);
-
-        try {
-            // --- TODO: Replace with your actual API endpoint ---
-             const payload: PreferencesUpdateDTO = {
-                 theme: preferences.theme as 'light' | 'dark', // Ensure type safety
-                 emailNotifications: preferences.emailNotifications,
-             };
-            await apiClient.put('/user/preferences', payload); // <<<< ASSUMED API CALL
-
-            toast.success("Preferences saved successfully!");
-
-        } catch (err: unknown) {
-            console.error("Error saving preferences:", err);
-             const errorMessage = axios.isAxiosError(err) && err.response?.data
-                 ? (err.response.data.errorMessage || err.response.data.message || JSON.stringify(err.response.data))
-                 : (err instanceof Error ? err.message : "An unknown error occurred.");
-            toast.error(`Failed to save preferences: ${errorMessage}`);
-        } finally {
-            setIsSavingPrefs(false);
-        }
-    };
-
-
-    // --- Render ---
-    if (status === 'loading') {
-        return (
-            <div className="flex justify-center items-center min-h-screen bg-gray-100 dark:bg-gray-900">
-                <Loader2 className="h-12 w-12 animate-spin text-indigo-600" />
-            </div>
-        );
+// Password Strength Checker
+const checkPasswordStrength = (password: string) => {
+  const strength = {
+    score: 0,
+    criteria: {
+      length: password.length >= 8,
+      uppercase: /[A-Z]/.test(password),
+      lowercase: /[a-z]/.test(password),
+      number: /\d/.test(password),
+      special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
     }
+  };
+  
+  strength.score = Object.values(strength.criteria).filter(Boolean).length;
+  
+  return {
+    ...strength,
+    level: strength.score <= 2 ? 'weak' : strength.score <= 4 ? 'medium' : 'strong',
+    color: strength.score <= 2 ? 'red' : strength.score <= 4 ? 'yellow' : 'green'
+  };
+};
 
-    // Optional: Redirect or show message if not authenticated
-    if (!session) {
-         return <div className="p-6 text-center text-red-600 dark:text-red-400">Please log in to access settings.</div>;
-    }
+// Enhanced Settings Card Component
+const SettingsCard: React.FC<{ 
+  title: string; 
+  icon: React.ReactNode; 
+  children: React.ReactNode;
+  className?: string;
+}> = ({ title, icon, children, className = "" }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 30, scale: 0.95 }}
+    animate={{ opacity: 1, y: 0, scale: 1 }}
+    transition={{ 
+      duration: 0.6, 
+      ease: [0.25, 0.46, 0.45, 0.94],
+      delay: 0.1 
+    }}
+    whileHover={{ 
+      y: -5,
+      boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+      transition: { duration: 0.3 }
+    }}
+    className={`relative bg-white/80 dark:bg-gray-800/80 backdrop-blur-xl rounded-3xl shadow-xl overflow-hidden border border-gray-200/50 dark:border-gray-700/50 ${className}`}
+  >
+    <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/50 via-transparent to-purple-50/50 dark:from-indigo-900/20 dark:to-purple-900/20" />
+    
+    <div className="relative p-8 border-b border-gray-200/50 dark:border-gray-700/50">
+      <div className="flex items-center space-x-4">
+        <motion.div
+          whileHover={{ scale: 1.1, rotate: 5 }}
+          transition={{ type: "spring", stiffness: 400, damping: 17 }}
+          className="relative p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg"
+        >
+          <div className="absolute inset-0 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-2xl blur opacity-50" />
+          <div className="relative">
+            {icon}
+          </div>
+        </motion.div>
+        <div>
+          <h2 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-gray-100 dark:to-gray-300 bg-clip-text text-transparent">
+            {title}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 mt-1">Update your security information</p>
+        </div>
+      </div>
+    </div>
+    
+    <div className="relative p-8">
+      {children}
+    </div>
+  </motion.div>
+);
 
-    return (
-        <div className="p-4 md:p-8 bg-gray-100 dark:bg-gray-900 min-h-screen transition-colors duration-300">
-            {/* Use theme state for ToastContainer */}
-            <ToastContainer position="bottom-right" autoClose={4000} theme={preferences.theme === 'dark' ? 'dark' : 'light'} />
+// Enhanced Input Component
+const SettingsInput: React.FC<{
+  label: string;
+  id: string;
+  type?: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  showPasswordToggle?: boolean;
+  showStrength?: boolean;
+  error?: string;
+  success?: boolean;
+}> = ({ 
+  label, id, type = "text", value, onChange, placeholder,
+  showPasswordToggle = false, showStrength = false, error, success 
+}) => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const passwordStrength = showStrength ? checkPasswordStrength(value) : null;
+  
+  const inputType = type === 'password' && showPassword ? 'text' : type;
 
-            {/* Header */}
+  return (
+    <div className="space-y-2">
+      <label htmlFor={id} className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+        {label} <span className="text-red-500">*</span>
+      </label>
+      
+      <div className="relative">
+        <motion.input
+          type={inputType}
+          id={id}
+          name={id}
+          value={value}
+          onChange={onChange}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          required
+          placeholder={placeholder}
+          className={`
+            block w-full px-4 py-3.5 rounded-xl border-2 transition-all duration-300
+            bg-gray-50/50 dark:bg-gray-700/50 backdrop-blur-sm
+            text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500
+            focus:outline-none focus:ring-0
+            ${error 
+              ? 'border-red-300 dark:border-red-600 focus:border-red-500' 
+              : success 
+                ? 'border-green-300 dark:border-green-600 focus:border-green-500'
+                : isFocused 
+                  ? 'border-indigo-400 dark:border-indigo-500 focus:border-indigo-500 shadow-lg shadow-indigo-500/25'
+                  : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
+            }
+          `}
+          animate={{
+            scale: isFocused ? 1.02 : 1,
+            transition: { duration: 0.2 }
+          }}
+        />
+        
+        {showPasswordToggle && (
+          <motion.button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+          >
+            {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+          </motion.button>
+        )}
+        
+        <AnimatePresence>
+          {(success || error) && (
             <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="mb-10"
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2"
             >
-                {/* Translated Header */}
-                <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">Settings</h1>
-                <p className="text-gray-600 dark:text-gray-400 mt-2">Manage your account information and application preferences.</p>
+              {success ? (
+                <CheckCircle className="text-green-500" size={20} />
+              ) : (
+                <XCircle className="text-red-500" size={20} />
+              )}
             </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      
+      {showStrength && value && passwordStrength && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          className="space-y-2 pt-2"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+              Password Strength
+            </span>
+            <span className={`text-xs font-bold ${
+              passwordStrength.color === 'red' ? 'text-red-500' :
+              passwordStrength.color === 'yellow' ? 'text-yellow-500' :
+              'text-green-500'
+            }`}>
+              {passwordStrength.level}
+            </span>
+          </div>
+          
+          <div className="flex space-x-1">
+            {[...Array(5)].map((_, i) => (
+              <motion.div
+                key={i}
+                className={`h-1.5 rounded-full flex-1 ${
+                  i < passwordStrength.score 
+                    ? passwordStrength.color === 'red' ? 'bg-red-500' :
+                      passwordStrength.color === 'yellow' ? 'bg-yellow-500' :
+                      'bg-green-500'
+                    : 'bg-gray-200 dark:bg-gray-600'
+                }`}
+              />
+            ))}
+          </div>
+          
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs pt-1">
+            {Object.entries(passwordStrength.criteria).map(([key, met]) => (
+              <div key={key} className={`flex items-center space-x-1.5 ${met ? 'text-green-600 dark:text-green-400' : 'text-gray-400 dark:text-gray-500'}`}>
+                {met ? <CheckCircle size={12} /> : <XCircle size={12} />}
+                <span>
+                  {key === 'length' ? '8+ Characters' :
+                   key === 'uppercase' ? 'Uppercase' :
+                   key === 'lowercase' ? 'Lowercase' :
+                   key === 'number' ? 'Number' : 'Special Character'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      )}
+      
+      <AnimatePresence>
+        {error && (
+          <motion.p
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="text-sm text-red-600 dark:text-red-400 flex items-center space-x-1 pt-1"
+          >
+            <XCircle size={14} />
+            <span>{error}</span>
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
 
-            {/* Grid layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+// Loading Spinner Component
+const LoadingSpinner = () => (
+  <div className="flex flex-col justify-center items-center min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+    <motion.div
+      animate={{ rotate: 360 }}
+      transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+      className="relative"
+    >
+      <div className="w-16 h-16 border-4 border-indigo-200 dark:border-indigo-800 rounded-full" />
+      <div className="absolute top-0 left-0 w-16 h-16 border-4 border-transparent border-t-indigo-600 rounded-full animate-spin" />
+    </motion.div>
+    <motion.p
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.5 }}
+      className="mt-4 text-gray-600 dark:text-gray-400 font-medium"
+    >
+      Loading...
+    </motion.p>
+  </div>
+);
 
-                {/* Column 1: Profile & Security */}
-                <div className="lg:col-span-2 space-y-6">
-                    {/* Personal Information Card */}
-                    <SettingsCard title="Personal Information" icon={<User size={20} />}>
-                        <form onSubmit={handleSaveProfile} className="space-y-4">
-                            <SettingsInput
-                                label="Display Name" // Translated
-                                id="name"
-                                value={profileData.name}
-                                onChange={handleProfileChange}
-                                placeholder="Your name" // Translated
-                                required
-                            />
-                            <SettingsInput
-                                label="Email" // Translated
-                                id="email"
-                                type="email"
-                                value={profileData.email}
-                                onChange={()=>{}} // No-op as it's disabled
-                                disabled // Email usually not changeable
-                                placeholder="Your email address" // Translated
-                            />
-                            <div className="pt-2 flex justify-end">
-                                <button type="submit" disabled={isSavingProfile}
-                                    className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 transition duration-150"
-                                >
-                                    {isSavingProfile ? <Loader2 size={18} className="animate-spin mr-2" /> : <Save size={18} className="mr-2" />}
-                                    {isSavingProfile ? 'Saving...' : 'Save Changes'} {/* Translated */}
-                                </button>
-                            </div>
-                        </form>
-                    </SettingsCard>
+// Main Settings Page Component
+export default function SettingsPage() {
+  const { status } = useSession();
+  const [passwordData, setPasswordData] = useState({ 
+    currentPassword: '', 
+    newPassword: '', 
+    confirmPassword: '' 
+  });
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
 
-                    {/* Security Card */}
-                    <SettingsCard title="Security" icon={<Key size={20} />}>
-                        <form onSubmit={handleChangePassword} className="space-y-4">
-                            <h3 className="text-md font-semibold text-gray-800 dark:text-gray-200 border-b dark:border-gray-700 pb-2">Change Password</h3> {/* Translated */}
-                            <SettingsInput
-                                label="Current Password" // Translated
-                                id="currentPassword"
-                                type="password"
-                                value={passwordData.currentPassword}
-                                onChange={handlePasswordChange}
-                                required
-                                placeholder="Enter current password" // Translated
-                            />
-                            <SettingsInput
-                                label="New Password" // Translated
-                                id="newPassword"
-                                type="password"
-                                value={passwordData.newPassword}
-                                onChange={handlePasswordChange}
-                                required
-                                placeholder="At least 6 characters" // Translated
-                            />
-                            <SettingsInput
-                                label="Confirm New Password" // Translated
-                                id="confirmPassword"
-                                type="password"
-                                value={passwordData.confirmPassword}
-                                onChange={handlePasswordChange}
-                                required
-                                placeholder="Re-enter new password" // Translated
-                            />
-                            <div className="pt-2 flex justify-end">
-                                <button type="submit" disabled={isChangingPassword}
-                                    className="inline-flex items-center px-4 py-2 bg-orange-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500 disabled:opacity-50 transition duration-150"
-                                >
-                                    {isChangingPassword ? <Loader2 size={18} className="animate-spin mr-2" /> : <Key size={18} className="mr-2" />}
-                                    {isChangingPassword ? 'Changing...' : 'Change Password'} {/* Translated */}
-                                </button>
-                            </div>
-                        </form>
-                    </SettingsCard>
-                </div>
+  const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setPasswordData(prev => ({ ...prev, [name]: value }));
+    if (formErrors[name]) {
+      setFormErrors(prev => ({ ...prev, [name]: '' }));
+    }
+  };
 
-                {/* Column 2: Preferences */}
-                <div className="lg:col-span-1 space-y-6">
-                    <SettingsCard title="Preferences" icon={<Palette size={20} />}>
-                        <form onSubmit={handleSavePreferences} className="space-y-4">
-                            {/* Theme Selection */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Theme</label> {/* Translated */}
-                                <div className="flex space-x-4">
-                                     {/* Added dark mode styles for buttons */}
-                                    <button type="button" onClick={() => handleThemeChange('light')}
-                                         className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors duration-150 ${preferences.theme === 'light'
-                                             ? 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700 ring-2 ring-indigo-200 dark:ring-indigo-800'
-                                             : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
-                                     >
-                                        ☀️ Light {/* Translated */}
-                                    </button>
-                                     <button type="button" onClick={() => handleThemeChange('dark')}
-                                         className={`px-4 py-2 rounded-md text-sm font-medium border transition-colors duration-150 ${preferences.theme === 'dark'
-                                             ? 'bg-gray-700 dark:bg-gray-600 text-white border-gray-600 dark:border-gray-500 ring-2 ring-gray-500 dark:ring-gray-400'
-                                             : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'}`}
-                                     >
-                                        🌙 Dark {/* Translated */}
-                                    </button>
-                                </div>
-                            </div>
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    if (!passwordData.currentPassword) errors.currentPassword = 'Current password is required';
+    if (!passwordData.newPassword) errors.newPassword = 'New password is required';
+    else if (passwordData.newPassword.length < 8) errors.newPassword = 'Password must be at least 8 characters';
+    if (!passwordData.confirmPassword) errors.confirmPassword = 'Please confirm your new password';
+    else if (passwordData.newPassword !== passwordData.confirmPassword) errors.confirmPassword = 'Confirmation password does not match';
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
-                            {/* Notification Settings */}
-                            <div className="pt-4">
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Notifications</label> {/* Translated */}
-                                <div className="space-y-2">
-                                    <label className="flex items-center space-x-3 cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            name="emailNotifications" // Matches state key
-                                            checked={preferences.emailNotifications}
-                                            onChange={handleNotificationChange}
-                                             // Added dark mode styles for checkbox
-                                            className="h-4 w-4 text-indigo-600 dark:text-indigo-400 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-gray-100 dark:bg-gray-700 focus:ring-offset-0 dark:focus:ring-offset-gray-800"
-                                        />
-                                        {/* Translated Label */}
-                                        <span className="text-sm text-gray-700 dark:text-gray-300">Receive email notifications for device alerts</span>
-                                    </label>
-                                    {/* Add more notification options if needed */}
-                                </div>
-                            </div>
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateForm()) {
+      toast.error("Please correct the errors before submitting.", toastConfig);
+      return;
+    }
+    setIsChangingPassword(true);
+    const payload: PasswordDTO = {
+      oldPassword: passwordData.currentPassword,
+      newPassword: passwordData.newPassword,
+      confirmPassword: passwordData.confirmPassword
+    };
+    try {
+      const response = await apiClient.patch('/users/me/password', payload);
+      setShowSuccessAnimation(true);
+      setTimeout(() => setShowSuccessAnimation(false), 3000);
+      toast.success(response.data?.message || "🎉 Password changed successfully!", toastConfig);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      setFormErrors({});
+    } catch (err: unknown) {
+      let errorMessage = "An unknown error occurred.";
+      if (axios.isAxiosError(err) && err.response?.data) {
+        const errorData = err.response.data as { message?: string, detail?: string };
+        errorMessage = errorData.message || errorData.detail || `Error: ${err.response.status}`;
+      } else if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      toast.error(`❌ Password change failed: ${errorMessage}`, toastConfig);
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
 
-                            <div className="pt-4 flex justify-end">
-                                <button type="submit" disabled={isSavingPrefs}
-                                    className="inline-flex items-center px-4 py-2 bg-teal-600 text-white text-sm font-medium rounded-md shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 disabled:opacity-50 transition duration-150"
-                                >
-                                    {isSavingPrefs ? <Loader2 size={18} className="animate-spin mr-2" /> : <Save size={18} className="mr-2" />}
-                                    {isSavingPrefs ? 'Saving...' : 'Save Preferences'} {/* Translated */}
-                                </button>
-                            </div>
-                        </form>
-                    </SettingsCard>
-                </div>
-
-            </div> {/* End Grid */}
-        </div> // End Main Container
+  if (status === 'loading') return <LoadingSpinner />;
+  
+  if (status === 'unauthenticated') {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="flex items-center justify-center min-h-screen bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20"
+      >
+        <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl">
+          <Shield className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">Access Denied</h2>
+          <p className="text-gray-600 dark:text-gray-400">Please log in to access the settings page.</p>
+        </div>
+      </motion.div>
     );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-all duration-500">
+      <ToastContainer {...toastConfig} />
+      
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+        <div className="absolute top-40 left-40 w-80 h-80 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
+      </div>
+
+      <div className="relative p-4 md:p-8">
+        <motion.div
+          initial={{ opacity: 0, y: -30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="mb-12 max-w-4xl mx-auto text-center"
+        >
+          <motion.div whileHover={{ scale: 1.05 }} className="inline-flex items-center space-x-3 mb-6">
+            <div className="p-3 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl text-white shadow-lg">
+              <Sparkles size={32} />
+            </div>
+            <h1 className="text-5xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-800 bg-clip-text text-transparent">
+              Account Settings
+            </h1>
+          </motion.div>
+          <motion.p
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
+            className="text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto"
+          >
+            Manage your security and personal information with a modern and secure interface.
+          </motion.p>
+        </motion.div>
+
+        <div className="max-w-3xl mx-auto">
+          <SettingsCard title="Advanced Security" icon={<Shield size={28} />}>
+            <form onSubmit={handleChangePassword} className="space-y-8">
+              <div className="space-y-6">
+                <SettingsInput
+                  label="Current Password"
+                  id="currentPassword"
+                  type="password"
+                  value={passwordData.currentPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="Enter your current password"
+                  showPasswordToggle={true}
+                  error={formErrors.currentPassword}
+                />
+                <SettingsInput
+                  label="New Password"
+                  id="newPassword"
+                  type="password"
+                  value={passwordData.newPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="At least 8 characters"
+                  showPasswordToggle={true}
+                  showStrength={true}
+                  error={formErrors.newPassword}
+                />
+                <SettingsInput
+                  label="Confirm New Password"
+                  id="confirmPassword"
+                  type="password"
+                  value={passwordData.confirmPassword}
+                  onChange={handlePasswordChange}
+                  placeholder="Re-enter your new password"
+                  showPasswordToggle={true}
+                  error={formErrors.confirmPassword}
+                  success={!!passwordData.confirmPassword && passwordData.newPassword === passwordData.confirmPassword}
+                />
+              </div>
+
+              <div className="pt-4 flex justify-end">
+                <motion.button
+                  type="submit"
+                  disabled={isChangingPassword}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="relative overflow-hidden inline-flex items-center justify-center px-8 py-4 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-semibold rounded-2xl shadow-lg transition-all duration-300 transform hover:shadow-xl hover:shadow-indigo-500/25 focus:outline-none focus:ring-4 focus:ring-indigo-500/50 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <div className="relative z-10 flex items-center space-x-2">
+                    <AnimatePresence mode="wait">
+                      {isChangingPassword ? (
+                        <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center space-x-2">
+                          <Loader2 size={20} className="animate-spin" />
+                          <span>Processing...</span>
+                        </motion.div>
+                      ) : showSuccessAnimation ? (
+                        <motion.div key="success" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }} className="flex items-center space-x-2">
+                          <CheckCircle size={20} />
+                          <span>Success!</span>
+                        </motion.div>
+                      ) : (
+                        <motion.div key="default" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center space-x-2">
+                          <Zap size={20} />
+                          <span>Update Password</span>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.button>
+              </div>
+            </form>
+          </SettingsCard>
+        </div>
+      </div>
+    </div>
+  );
 }
